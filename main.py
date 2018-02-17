@@ -86,17 +86,23 @@ class ErrorHandler():
         dispatcher.add_error_handler(self.handle_error)
 
     def handle_error(self, bot, update, error):
+        from_user = update.callback_query.from_user if update.callback_query else update.message.from_user
         chat = update.callback_query.message.chat if update.callback_query else update.message.chat
         if type(error) == Unauthorized:
-            text = "I don't have permission to PM you. Please click here: {}.".format('https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
+            text = "{}, I don't have permission to PM you. Please click here: {}.".format(from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
+            bot.send_message(chat_id=chat.id, text=text)
         else:
-            text = "Oh no, something went wrong!\n\nError message: {}".format(error)
-
-        chat = update.callback_query.message.chat if update.callback_query else update.message.chat
-        bot.send_message(chat_id=chat.id, text=text)
+            text = "Oh no, something went wrong in {}!\n\nError message: {}".format(chat.title, error)
+            bot.send_message(chat_id=Helper().get_creator(chat).id, text=text)
 
 
 class Helpers():
+    @staticmethod
+    def get_creator(chat):
+        for admin in chat.get_administrators():
+            if admin.status == "creator":
+                return admin.user
+
     @staticmethod
     def list_mods(chat):
         mods = []
