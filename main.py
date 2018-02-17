@@ -87,11 +87,9 @@ class ErrorHandler():
 
     def handle_error(self, bot, update, error):
         if type(error) == Unauthorized:
-            text = "I don't have permission to PM you, please click my profile, type /start in a PM and try again."
+            text = "I don't have permission to PM you. Please click my profile, press the START button, and try again."
         else:
-            text = "Oh no, something went wrong!"
-
-        #text += "\n\nError message: {}".format(error)
+            text = "Oh no, something went wrong!\n\nError message: {}".format(error)
 
         chat = update.callback_query.message.chat if update.callback_query else update.message.chat
         bot.send_message(chat_id=chat.id, text=text)
