@@ -215,7 +215,7 @@ class RuleHandler():
         text += "The group rules are:\n{}\n\n".format(group.rules)
         text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
 
-        bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
+        #bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
         bot.send_message(chat_id=from_user.id, text=text)
 
 
