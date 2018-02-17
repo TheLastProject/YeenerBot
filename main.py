@@ -189,8 +189,8 @@ class RuleHandler():
             bot.send_message(chat_id=chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
 
-        bot.send_message(chat_id=chat.id, text="I'm PMing you the rules now.")
-        rules += "\n\nYour mods are: {}".format("\n".join(admin.user.name for admin in chat.get_administrators()))
+        bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
+        rules += "\n\nYour mods are:\n{}".format("\n".join(admin.user.name for admin in chat.get_administrators()))
         bot.send_message(chat_id=from_user.id, text=rules)
 
 
