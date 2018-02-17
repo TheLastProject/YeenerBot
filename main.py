@@ -14,7 +14,7 @@ from distutils.util import strtobool
 
 import dataset
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import Unauthorized
 from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
@@ -108,6 +108,12 @@ class Helpers():
         mods.sort()
         return ["{} (owner)".format(creator)] + mods
 
+
+    @staticmethod
+    def get_description(bot, chat, group):
+        return group.description if group.description else bot.get_chat(chat.id).description
+
+
 class GreetingHandler():
     def __init__(self, dispatcher):
         welcome_handler = MessageHandler(Filters.status_update.new_chat_members, self.welcome)
@@ -159,7 +165,7 @@ class GreetingHandler():
                 'title': update.message.chat.title,
                 'invite_link': update.message.chat.invite_link,
                 'mods': ", ".join(Helpers.list_mods(update.message.chat)),
-                'description': group.description if group.description else update.message.chat.description}
+                'description': Helpers.get_description(bot, update.message.chat, group)}
 
         text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! Please make sure to read the /rules."
 
@@ -195,15 +201,22 @@ class RuleHandler():
         from_user = update.callback_query.from_user if update.callback_query else update.message.from_user
         chat = update.callback_query.message.chat if update.callback_query else update.message.chat
 
-        rules = DB().get_group(chat.id).rules
+        group = DB().get_group(chat.id)
 
-        if not rules:
+        if not group.rules:
             bot.send_message(chat_id=chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
 
+        text = "{}\n\n".format(chat.title)
+        description = Helpers.get_description(bot, chat, group)
+        if description:
+            text += "{}\n\n".format(description)
+
+        text += "The group rules are:\n{}\n\n".format(group.rules)
+        text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
+
         bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
-        rules += "\n\nYour mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
-        bot.send_message(chat_id=from_user.id, text=rules)
+        bot.send_message(chat_id=from_user.id, text=text)
 
 
 # Setup
