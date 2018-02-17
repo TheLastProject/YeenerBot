@@ -137,7 +137,12 @@ class GreetingHandler():
         if not group.welcome_enabled:
             return
 
-        data = {'usernames': ", ".join([member.name for member in update.message.new_chat_members]),
+        # Don't welcome bots (or ourselves)
+        members = [member.name for member in update.message.new_chat_members if not member.is_bot]
+        if len(members) == 0:
+            return
+
+        data = {'usernames': ", ".join(members),
                 'title': update.message.chat.title,
                 'invite_link': update.message.chat.invite_link,
                 'mods': ", ".join([admin.user.name for admin in update.message.chat.get_administrators()]),
