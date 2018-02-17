@@ -94,6 +94,20 @@ class ErrorHandler():
         chat = update.callback_query.message.chat if update.callback_query else update.message.chat
         bot.send_message(chat_id=chat.id, text=text)
 
+
+class Helpers():
+    @staticmethod
+    def list_mods(chat):
+        mods = []
+        for admin in chat.get_administrators():
+            if admin.status == "creator":
+                creator = admin.user.name
+            else:
+                mods.append(admin.user.name)
+
+        mods.sort()
+        return ["{} (owner)".format(creator)] + mods
+
 class GreetingHandler():
     def __init__(self, dispatcher):
         welcome_handler = MessageHandler(Filters.status_update.new_chat_members, self.welcome)
@@ -144,7 +158,7 @@ class GreetingHandler():
         data = {'usernames': ", ".join(members),
                 'title': update.message.chat.title,
                 'invite_link': update.message.chat.invite_link,
-                'mods': ", ".join([admin.user.name for admin in update.message.chat.get_administrators()]),
+                'mods': ", ".join(Helpers.list_mods(update.message.chat)),
                 'description': group.description if group.description else update.message.chat.description}
 
         text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! Please make sure to read the /rules."
@@ -188,7 +202,7 @@ class RuleHandler():
             return
 
         bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
-        rules += "\n\nYour mods are:\n{}".format("\n".join(admin.user.name for admin in chat.get_administrators()))
+        rules += "\n\nYour mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
         bot.send_message(chat_id=from_user.id, text=rules)
 
 
