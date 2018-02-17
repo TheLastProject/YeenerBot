@@ -91,9 +91,10 @@ class ErrorHandler():
         else:
             text = "Oh no, something went wrong!"
 
-        text += "\n\nError message: {}".format(error)
+        #text += "\n\nError message: {}".format(error)
 
-        bot.send_message(chat_id=update.message.chat_id, text=text)
+        chat = update.callback_query.message.chat if update.callback_query else update.message.chat
+        bot.send_message(chat_id=chat.id, text=text)
 
 class GreetingHandler():
     def __init__(self, dispatcher):
@@ -148,7 +149,7 @@ class GreetingHandler():
                 'mods': ", ".join([admin.user.name for admin in update.message.chat.get_administrators()]),
                 'description': group.description if group.description else update.message.chat.description}
 
-        text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! Please make sure to read the rules."
+        text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! Please make sure to read the /rules."
 
         bot.send_message(chat_id=update.message.chat_id,
                          text=text.format(**data),
@@ -180,14 +181,16 @@ class RuleHandler():
 
     def send_rules(self, bot, update):
         from_user = update.callback_query.from_user if update.callback_query else update.message.from_user
+        chat = update.callback_query.message.chat if update.callback_query else update.message.chat
 
-        rules = DB().get_group(update.message.chat.id).rules
+        rules = DB().get_group(chat.id).rules
 
         if not rules:
-            bot.send_message(chat_id=update.message.chat_id, text="No rules set for this group yet. Just don't be a meanie, okay?")
+            bot.send_message(chat_id=chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
 
-        rules += "\n\nYour mods are: {}".format("\n".join(admin.user.name for admin in update.message.chat.get_administrators()))
+        bot.send_message(chat_id=chat.id, text="I'm PMing you the rules now.")
+        rules += "\n\nYour mods are: {}".format("\n".join(admin.user.name for admin in chat.get_administrators()))
         bot.send_message(chat_id=from_user.id, text=rules)
 
 
