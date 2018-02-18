@@ -9,6 +9,7 @@
 
 import logging
 import os
+import random
 
 from distutils.util import strtobool
 
@@ -211,6 +212,34 @@ class GreetingHandler():
                          text=text.format(**data),
                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]]))
 
+class RandomHandler():
+    def __init__(self, dispatcher):
+        roll_handler = CommandHandler('roll', RandomHandler.roll)
+        dispatcher.add_handler(roll_handler)
+
+    @staticmethod
+    def roll(bot, update):
+        try:
+            roll = update.message.text.split(' ', 1)[1]
+        except IndexError:
+            roll = '1d20'
+
+        try:
+            dice = [int(n) for n in roll.split('d', 1)]
+        except (IndexError, ValueError):
+            bot.send_message(chat_id=update.message.chat_id, text="I can't roll a {}, whatever that is. Give me something like 1d20.".format(roll))
+            return
+
+        if dice[0] >= 1000 or dice[1] >= 1000:
+            bot.send_message(chat_id=update.message.chat_id, text="Sorry, but I'm limited to 999d999.")
+            return
+
+        results = []
+        for i in range(0, dice[0]):
+            results.append(random.randint(1, dice[1]))
+
+        bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" ".join([str(result) for result in results]), str(sum(results))))
+
 
 class RuleHandler():
     def __init__(self, dispatcher):
@@ -274,6 +303,7 @@ dispatcher = updater.dispatcher
 ErrorHandler(dispatcher)
 DebugHandler(dispatcher)
 GreetingHandler(dispatcher)
+RandomHandler(dispatcher)
 RuleHandler(dispatcher)
 
 # Start bot
