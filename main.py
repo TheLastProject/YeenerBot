@@ -93,7 +93,7 @@ class ErrorHandler():
             bot.send_message(chat_id=chat.id, text=text)
         else:
             text = "Oh no, something went wrong in {}!\n\nError message: {}".format(chat.title, error)
-            bot.send_message(chat_id=Helper().get_creator(chat).id, text=text)
+            bot.send_message(chat_id=Helpers.get_creator(chat).id, text=text)
 
 
 class Helpers():
@@ -230,6 +230,12 @@ class RuleHandler():
     def send_rules(bot, update):
         from_user = update.callback_query.from_user if update.callback_query else update.message.from_user
         chat = update.callback_query.message.chat if update.callback_query else update.message.chat
+
+        # Notify owner
+        try:
+            bot.send_message(chat_id=Helpers.get_creator(chat).id, text="{} just requested the rules for {}.".format(from_user.name, chat.title))
+        except Unauthorized:
+            pass
 
         group = DB().get_group(chat.id)
 
