@@ -121,6 +121,16 @@ class Helpers():
         return group.description if group.description else bot.get_chat(chat.id).description
 
 
+class DebugHandler():
+    def __init__(self, dispatcher):
+        ping_handler = CommandHandler('ping', DebugHandler.ping)
+        dispatcher.add_handler(ping_handler)
+
+    @staticmethod
+    def ping(bot, update):
+        bot.send_message(chat_id=update.message.chat_id, text="Pong")
+
+
 class GreetingHandler():
     def __init__(self, dispatcher):
         start_handler = CommandHandler('start', GreetingHandler.start)
@@ -262,6 +272,7 @@ dispatcher = updater.dispatcher
 
 # Initialize handler
 ErrorHandler(dispatcher)
+DebugHandler(dispatcher)
 GreetingHandler(dispatcher)
 RuleHandler(dispatcher)
 
