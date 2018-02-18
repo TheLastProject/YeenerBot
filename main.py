@@ -164,13 +164,14 @@ class GreetingHandler():
     @staticmethod
     @ensure_admin
     def toggle_welcome(bot, update):
+        group = DB().get_group(update.message.chat.id)
+
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.message.chat_id, text="Please specify true or false")
+            bot.send_message(chat_id=update.message.chat_id, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled))
             return
 
-        group = DB().get_group(update.message.chat.id)
         group.welcome_enabled = enabled
         group.save()
 
