@@ -212,6 +212,21 @@ class GreetingHandler():
                          text=text.format(**data),
                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]]))
 
+class GroupInfoHandler():
+    def __init__(self, dispatcher):
+        invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
+        dispatcher.add_handler(invitelink_handler)
+
+    @staticmethod
+    def invitelink(bot, update):
+        chat = bot.get_chat(update.message.chat.id)
+        if not chat.invite_link:
+            bot.send_message(chat_id=chat.id, text="{} does not have an invite link".format(chat.title))
+            return
+
+        bot.send_message(chat_id=chat.tid, text="Invite link for {} is {}".format(chat.title, chat.invite_link))
+
+
 class RandomHandler():
     def __init__(self, dispatcher):
         roll_handler = CommandHandler('roll', RandomHandler.roll)
@@ -298,6 +313,7 @@ class RuleHandler():
         text += "The group rules are:\n{}\n\n".format(group.rules)
         text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
 
+
         #bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
         bot.send_message(chat_id=from_user.id, text=text)
 
@@ -311,6 +327,7 @@ dispatcher = updater.dispatcher
 ErrorHandler(dispatcher)
 DebugHandler(dispatcher)
 GreetingHandler(dispatcher)
+#GroupInfoHandler(dispatcher)
 RandomHandler(dispatcher)
 RuleHandler(dispatcher)
 
