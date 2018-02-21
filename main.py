@@ -106,15 +106,23 @@ class Helpers():
 
     @staticmethod
     def list_mods(chat):
+        creator = None
         mods = []
         for admin in chat.get_administrators():
+            # Skip bots
+            if admin.user.is_bot:
+                continue
+
             if admin.status == "creator":
                 creator = admin.user.name
             else:
                 mods.append(admin.user.name)
 
         mods.sort()
-        return ["{} (owner)".format(creator)] + mods
+        if creator:
+            mods = ["{} (owner)".format(creator)] + mods
+
+        return mods
 
 
     @staticmethod
