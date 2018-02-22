@@ -243,15 +243,10 @@ class RandomHandler():
     @staticmethod
     def roll(bot, update):
         try:
-            roll = update.message.text.split(' ', 1)[1]
-        except IndexError:
-            roll = '1d20'
-
-        try:
+            roll = update.message.text.split(' ', 2)[1]
             dice = [int(n) for n in roll.split('d', 1)]
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.message.chat_id, text="I can't roll a {}, whatever that is. Give me something like 1d20.".format(roll))
-            return
+            dice = [1, 20]
 
         if dice[0] < 1 or dice[1] < 1:
             bot.send_message(chat_id=update.message.chat_id, text="Very funny.")
@@ -269,7 +264,7 @@ class RandomHandler():
         for i in range(0, dice[0]):
             results.append(random.randint(1, dice[1]))
 
-        bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" ".join([str(result) for result in results]), str(sum(results))))
+        bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" + ".join([str(result) for result in results]), str(sum(results))))
 
 
 class RuleHandler():
