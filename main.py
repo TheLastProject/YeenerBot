@@ -256,11 +256,11 @@ class RandomHandler():
         roll_handler = CommandHandler('roll', RandomHandler.roll)
         flip_handler = CommandHandler('flip', RandomHandler.flip)
         shake_handler = CommandHandler('shake', RandomHandler.shake)
-        rr_handler = CommandHandler('rr', RandomHandler.rr)
+        #rr_handler = CommandHandler('rr', RandomHandler.rr)
         dispatcher.add_handler(roll_handler)
         dispatcher.add_handler(flip_handler)
         dispatcher.add_handler(shake_handler)
-        dispatcher.add_handler(rr_handler)
+        #dispatcher.add_handler(rr_handler)
 
     @staticmethod
     def roll(bot, update):
