@@ -23,13 +23,13 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 def ensure_creator(function):
-    def wrapper(self, bot, update, **optional_args):
+    def wrapper(bot, update, **optional_args):
         member = update.message.chat.get_member(update.message.from_user.id)
         if member.status != 'creator':
             bot.send_message(chat_id=update.message.chat_id, text="You do not have the required permission to do this.")
             return
 
-        return function(self=self, bot=bot, update=update, **optional_args)
+        return function(bot=bot, update=update, **optional_args)
 
     return wrapper
 
@@ -223,16 +223,26 @@ class GreetingHandler():
 class GroupInfoHandler():
     def __init__(self, dispatcher):
         invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
+        revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupInfoHandler.revokeinvitelink)
         dispatcher.add_handler(invitelink_handler)
+        dispatcher.add_handler(revokeinvitelink_handler)
 
     @staticmethod
     def invitelink(bot, update):
         chat = bot.get_chat(update.message.chat.id)
         if not chat.invite_link:
-            bot.send_message(chat_id=chat.id, text="{} does not have an invite link".format(chat.title))
-            return
+            chat.invite_link = bot.export_chat_invite_link(chat.id)
+            if not chat.invite_link:
+                bot.send_message(chat_id=chat.id, text="{} does not have an invite link".format(chat.title))
+                return
 
-        bot.send_message(chat_id=chat.tid, text="Invite link for {} is {}".format(chat.title, chat.invite_link))
+        bot.send_message(chat_id=chat.id, text="Invite link for {} is {}".format(chat.title, chat.invite_link))
+
+    @staticmethod
+    @ensure_creator
+    def revokeinvitelink(bot, update):
+        bot.export_chat_invite_link(update.message.chat.id)
+        bot.send_message(chat_id=update.message.chat.id, text="Invite link for {} revoked".format(update.message.chat.title))
 
 
 class RandomHandler():
@@ -330,7 +340,7 @@ dispatcher = updater.dispatcher
 ErrorHandler(dispatcher)
 DebugHandler(dispatcher)
 GreetingHandler(dispatcher)
-#GroupInfoHandler(dispatcher)
+GroupInfoHandler(dispatcher)
 RandomHandler(dispatcher)
 RuleHandler(dispatcher)
 
