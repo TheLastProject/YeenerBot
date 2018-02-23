@@ -256,9 +256,11 @@ class RandomHandler():
         roll_handler = CommandHandler('roll', RandomHandler.roll)
         flip_handler = CommandHandler('flip', RandomHandler.flip)
         shake_handler = CommandHandler('shake', RandomHandler.shake)
+        rr_handler = CommandHandler('rr', RandomHandler.rr)
         dispatcher.add_handler(roll_handler)
         dispatcher.add_handler(flip_handler)
         dispatcher.add_handler(shake_handler)
+        dispatcher.add_handler(rr_handler)
 
     @staticmethod
     def roll(bot, update):
@@ -288,11 +290,11 @@ class RandomHandler():
 
     @staticmethod
     def flip(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text=text="● {}".format(random.choice(["Heads.","Tails."])))
+        bot.send_message(chat_id=update.message.chat_id, text=text="```> {}```".format(random.choice(["Heads.","Tails."])))
 
     @staticmethod
     def shake(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text="● {}".format(random.choice([
+        bot.send_message(chat_id=update.message.chat_id, text="```> {}```".format(random.choice([
             "It is certain.",
             "It is decidedly so.",
             "Without a doubt.",
@@ -313,7 +315,6 @@ class RandomHandler():
             "My sources say no.",
             "Outlook not so good.",
             "Very doubtful."])))
-
 
 class RuleHandler():
     def __init__(self, dispatcher):
