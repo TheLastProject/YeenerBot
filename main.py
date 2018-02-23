@@ -290,7 +290,7 @@ class RandomHandler():
 
     @staticmethod
     def flip(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text=text="```> {}```".format(random.choice(["Heads.","Tails."])))
+        bot.send_message(chat_id=update.message.chat_id, text="```> {}```".format(random.choice(["Heads.","Tails."])))
 
     @staticmethod
     def shake(bot, update):
