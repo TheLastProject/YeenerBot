@@ -129,6 +129,14 @@ class Helpers():
     def get_description(bot, chat, group):
         return group.description if group.description else bot.get_chat(chat.id).description
 
+    @staticmethod
+    def get_invite_link(bot, chat):
+        chat = bot.get_chat(chat.id)
+        if not chat.invite_link:
+            chat.invite_link = bot.export_chat_invite_link(chat.id)
+
+        return chat.invite_link
+
 
 class DebugHandler():
     def __init__(self, dispatcher):
@@ -209,7 +217,7 @@ class GreetingHandler():
 
         data = {'usernames': ", ".join(members),
                 'title': update.message.chat.title,
-                'invite_link': update.message.chat.invite_link,
+                'invite_link': Helpers.get_invite_link(bot, update.message.chat),
                 'mods': ", ".join(Helpers.list_mods(update.message.chat)),
                 'description': Helpers.get_description(bot, update.message.chat, group),
                 'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)}
@@ -229,14 +237,12 @@ class GroupInfoHandler():
 
     @staticmethod
     def invitelink(bot, update):
-        chat = bot.get_chat(update.message.chat.id)
-        if not chat.invite_link:
-            chat.invite_link = bot.export_chat_invite_link(chat.id)
-            if not chat.invite_link:
-                bot.send_message(chat_id=chat.id, text="{} does not have an invite link".format(chat.title))
-                return
+        invite_link = Helpers.get_invite_link(bot, update.message.chat.id)
+        if not invite_link:
+            bot.send_message(chat_id=update.message.chat.id, text="{} does not have an invite link".format(update.message.chat.title))
+            return
 
-        bot.send_message(chat_id=chat.id, text="Invite link for {} is {}".format(chat.title, chat.invite_link))
+        bot.send_message(chat_id=update.message.chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
 
     @staticmethod
     @ensure_creator
