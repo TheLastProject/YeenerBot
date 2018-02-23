@@ -290,7 +290,11 @@ class RandomHandler():
 
     @staticmethod
     def flip(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice(["Heads.","Tails."])))
+        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
+            "Heads.",
+            "Tails.",
+            "The coin has landed sideways."
+        ], weights=[45,45,10])[0]))
 
     @staticmethod
     def shake(bot, update):
@@ -314,7 +318,15 @@ class RandomHandler():
             "My reply is no.",
             "My sources say no.",
             "Outlook not so good.",
-            "Very doubtful."])))
+            "Very doubtful."
+        ])))
+
+    @staticmethod
+    def rr(bot, update):
+        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
+            "",
+            ""
+        ])))
 
 class RuleHandler():
     def __init__(self, dispatcher):
