@@ -64,16 +64,18 @@ class DB():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, bullet=None, chamber=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
         self.description = description
         self.rules = rules
+        self.bullet = bullet if bullet is not None else random.randint(0,5)
+        self.chamber = chamber if chamber is not None else 5
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'bullet', 'chamber']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -145,7 +147,11 @@ class DebugHandler():
 
     @staticmethod
     def ping(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text="Pong")
+        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
+            "Pong.",
+            "Ha! I win.",
+            "Damn, I missed!"
+        ], weights=[90,5,5])[0]))
 
 
 class GreetingHandler():
@@ -237,7 +243,7 @@ class GroupInfoHandler():
 
     @staticmethod
     def invitelink(bot, update):
-        invite_link = Helpers.get_invite_link(bot, update.message.chat.id)
+        invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
             bot.send_message(chat_id=update.message.chat.id, text="{} does not have an invite link".format(update.message.chat.title))
             return
@@ -256,11 +262,11 @@ class RandomHandler():
         roll_handler = CommandHandler('roll', RandomHandler.roll)
         flip_handler = CommandHandler('flip', RandomHandler.flip)
         shake_handler = CommandHandler('shake', RandomHandler.shake)
-        #rr_handler = CommandHandler('rr', RandomHandler.rr)
+        roulette_handler = CommandHandler('roulette', RandomHandler.roulette)
         dispatcher.add_handler(roll_handler)
         dispatcher.add_handler(flip_handler)
         dispatcher.add_handler(shake_handler)
-        #dispatcher.add_handler(rr_handler)
+        dispatcher.add_handler(roulette_handler)
 
     @staticmethod
     def roll(bot, update):
@@ -322,11 +328,31 @@ class RandomHandler():
         ])))
 
     @staticmethod
-    def rr(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
-            "",
-            ""
-        ])))
+    def roulette(bot, update):
+        group = DB().get_group(update.message.chat.id)
+
+        # Go to next chamber
+        if group.chamber == 5:
+            group.chamber = 0
+        else:
+            group.chamber += 1
+        group.save()
+
+        # Check if bullet is in chamber
+        if group.bullet == group.chamber:
+            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *BOOM!* Your brain is now all over the wall behind you.</code>")
+            group.bullet = random.randint(0,5)
+            group.chamber = 5
+            group.save()
+            for admin in update.message.chat.get_administrators():
+                if admin.user.id == update.message.from_user.id:
+                    return
+            bot.send_message(chat_id=update.message.from_user.id, text = Helpers.get_invite_link(bot, update.message.chat))
+            bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+            bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+        else:
+            chambersremaining = 5 - group.chamber
+            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""))
 
 class RuleHandler():
     def __init__(self, dispatcher):
