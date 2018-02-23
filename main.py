@@ -254,7 +254,11 @@ class GroupInfoHandler():
 class RandomHandler():
     def __init__(self, dispatcher):
         roll_handler = CommandHandler('roll', RandomHandler.roll)
+        flip_handler = CommandHandler('flip', RandomHandler.flip)
+        shake_handler = CommandHandler('shake', RandomHandler.shake)
         dispatcher.add_handler(roll_handler)
+        dispatcher.add_handler(flip_handler)
+        dispatcher.add_handler(shake_handler)
 
     @staticmethod
     def roll(bot, update):
@@ -281,6 +285,34 @@ class RandomHandler():
             results.append(random.randint(1, dice[1]))
 
         bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" + ".join([str(result) for result in results]), str(sum(results))))
+
+    @staticmethod
+    def flip(bot, update):
+        bot.send_message(chat_id=update.message.chat_id, text=text="● {}".format(random.choice(["Heads.","Tails."])))
+
+    @staticmethod
+    def shake(bot, update):
+        bot.send_message(chat_id=update.message.chat_id, text="● {}".format(random.choice([
+            "It is certain.",
+            "It is decidedly so.",
+            "Without a doubt.",
+            "Yes, definitely.",
+            "You may rely on it.",
+            "As I see it, yes.",
+            "Most likely.",
+            "Outlook good.",
+            "Yes.",
+            "Signs point to yes.",
+            "Reply hazy, try again.",
+            "Ask again later.",
+            "Better not tell you now.",
+            "Cannot predict now.",
+            "Concentrate and ask again.",
+            "Don't count on it.",
+            "My reply is no.",
+            "My sources say no.",
+            "Outlook not so good.",
+            "Very doubtful."])))
 
 
 class RuleHandler():
