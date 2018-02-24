@@ -64,18 +64,19 @@ class DB():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, bullet=None, chamber=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
         self.description = description
         self.rules = rules
+        self.relatedchats = relatedchats
         self.bullet = bullet if bullet is not None else random.randint(0,5)
         self.chamber = chamber if chamber is not None else 5
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'bullet', 'chamber']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchats', 'bullet', 'chamber']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -238,12 +239,39 @@ class GroupInfoHandler():
     def __init__(self, dispatcher):
         description_handler = CommandHandler('description', GroupInfoHandler.description)
         setdescription_handler = CommandHandler('setdescription', GroupInfoHandler.set_description)
+        relatedchats_handler = CommandHandler('relatedchats', GroupInfoHandler.relatedchats)
+        setrelatedchats_handler = CommandHandler('setrelatedchats', GroupInfoHandler.set_relatedchats)
         invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
         revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupInfoHandler.revokeinvitelink)
         dispatcher.add_handler(description_handler)
         dispatcher.add_handler(setdescription_handler)
+        dispatcher.add_handler(relatedchats_handler)
+        dispatcher.add_handler(setrelatedchats_handler)
         dispatcher.add_handler(invitelink_handler)
         dispatcher.add_handler(revokeinvitelink_handler)
+
+    @staticmethod
+    def relatedchats(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        if group.relatedchats:
+            bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\nRelated chats:\n{}".format(update.message.chat.title, group.relatedchats))
+        else:
+            bot.send_message(chat_id=update.message.chat.id, text="There are no known related chats for this group")
+
+    @staticmethod
+    @ensure_creator
+    def set_relatedchats(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        text = "Related chats set."
+        try:
+            group.relatedchats = update.message.text.split(' ', 1)[1]
+        except IndexError:
+            group.relatedchats = None
+            text = "Related chats cleared."
+
+        group.save()
+
+        bot.send_message(chat_id=update.message.chat_id, text=text)
 
     @staticmethod
     def description(bot, update):
@@ -427,8 +455,9 @@ class RuleHandler():
         text += "The group rules are:\n{}\n\n".format(group.rules)
         text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
 
+        if group.relatedchats:
+            text += "\n\nRelated chats:\n{}".format(group.relatedchats)
 
-        #bot.send_message(chat_id=chat.id, text="{}, I'm PMing you the rules now.".format(from_user.name))
         bot.send_message(chat_id=from_user.id, text=text)
 
 
