@@ -236,10 +236,34 @@ class GreetingHandler():
 
 class GroupInfoHandler():
     def __init__(self, dispatcher):
+        description_handler = CommandHandler('description', GroupInfoHandler.description)
+        setdescription_handler = CommandHandler('setdescription', GroupInfoHandler.set_description)
         invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
         revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupInfoHandler.revokeinvitelink)
+        dispatcher.add_handler(description_handler)
+        dispatcher.add_handler(setdescription_handler)
         dispatcher.add_handler(invitelink_handler)
         dispatcher.add_handler(revokeinvitelink_handler)
+
+    @staticmethod
+    def description(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, Helpers.get_description(bot, update.message.chat, group)))
+
+    @staticmethod
+    @ensure_creator
+    def set_description(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        text = "Description set."
+        try:
+            group.description = update.message.text.split(' ', 1)[1]
+        except IndexError:
+            group.description = None
+            text = "Description reset to default (fallback to Telegram description)."
+
+        group.save()
+
+        bot.send_message(chat_id=update.message.chat_id, text=text)
 
     @staticmethod
     def invitelink(bot, update):
