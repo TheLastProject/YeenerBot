@@ -468,4 +468,4 @@ RandomHandler(dispatcher)
 RuleHandler(dispatcher)
 
 # Start bot
-updater.start_polling()
+updater.start_polling(bootstrap_retries=-1)
