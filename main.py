@@ -90,14 +90,12 @@ class ErrorHandler():
         dispatcher.add_error_handler(self.handle_error)
 
     def handle_error(self, bot, update, error):
-        from_user = update.callback_query.from_user if update.callback_query else update.message.from_user
-        chat = update.callback_query.message.chat if update.callback_query else update.message.chat
         if type(error) == Unauthorized:
-            text = "{}, I don't have permission to PM you. Please click here: {}.".format(from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
-            bot.send_message(chat_id=chat.id, text=text)
+            text = "{}, I don't have permission to PM you. Please click here: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
+            bot.send_message(chat_id=update.message.chat.id, text=text)
         else:
-            text = "Oh no, something went wrong in {}!\n\nError message: {}".format(chat.title, error)
-            bot.send_message(chat_id=Helpers.get_creator(chat).id, text=text)
+            text = "Oh no, something went wrong in {}!\n\nError message: {}".format(update.message.chat.title, error)
+            bot.send_message(chat_id=Helpers.get_creator(update.message.chat).id, text=text)
 
 
 class Helpers():
@@ -409,7 +407,6 @@ class RandomHandler():
 class RuleHandler():
     def __init__(self, dispatcher):
         rules_handler = CommandHandler('rules', RuleHandler.send_rules)
-        callback_rules_handler = CallbackQueryHandler(RuleHandler.send_rules, pattern='/rules')
         setrules_handler = CommandHandler('setrules', RuleHandler.set_rules)
         dispatcher.add_handler(rules_handler)
         dispatcher.add_handler(callback_rules_handler)
@@ -432,23 +429,20 @@ class RuleHandler():
 
     @staticmethod
     def send_rules(bot, update):
-        from_user = update.callback_query.from_user if update.callback_query else update.message.from_user
-        chat = update.callback_query.message.chat if update.callback_query else update.message.chat
-
         # Notify owner
         try:
-            bot.send_message(chat_id=Helpers.get_creator(chat).id, text="{} just requested the rules for {}.".format(from_user.name, chat.title))
+            bot.send_message(chat_id=Helpers.get_creator(update.message.chat).id, text="{} just requested the rules for {}.".format(update.message.from_user.name, update.message.chat.title))
         except Unauthorized:
             pass
 
-        group = DB().get_group(chat.id)
+        group = DB().get_group(update.message.chat.id)
 
         if not group.rules:
-            bot.send_message(chat_id=chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
+            bot.send_message(chat_id=update.message.chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
 
-        text = "{}\n\n".format(chat.title)
-        description = Helpers.get_description(bot, chat, group)
+        text = "{}\n\n".format(update.message.chat.title)
+        description = Helpers.get_description(bot, update.message.chat, group)
         if description:
             text += "{}\n\n".format(description)
 
@@ -458,7 +452,7 @@ class RuleHandler():
         if group.relatedchats:
             text += "\n\nRelated chats:\n{}".format(group.relatedchats)
 
-        bot.send_message(chat_id=from_user.id, text=text)
+        bot.send_message(chat_id=update.message.from_user.id, text=text)
 
 
 # Setup
