@@ -409,7 +409,6 @@ class RuleHandler():
         rules_handler = CommandHandler('rules', RuleHandler.send_rules)
         setrules_handler = CommandHandler('setrules', RuleHandler.set_rules)
         dispatcher.add_handler(rules_handler)
-        dispatcher.add_handler(callback_rules_handler)
         dispatcher.add_handler(setrules_handler)
 
     @staticmethod
