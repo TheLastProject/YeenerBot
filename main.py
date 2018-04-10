@@ -7,13 +7,17 @@
 #
 # See LICENSE for more information
 
+import io
+import json
 import logging
 import os
 import random
 
+from collections import OrderedDict
 from distutils.util import strtobool
 
 import dataset
+import requests
 
 from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import Unauthorized
@@ -453,9 +457,42 @@ class RuleHandler():
 
         bot.send_message(chat_id=update.message.from_user.id, text=text)
 
+class SauceNaoHandler():
+    def __init__(self, dispatcher):
+        saucenao_handler = CommandHandler('source', SauceNaoHandler.get_source)
+        dispatcher.add_handler(saucenao_handler)
+
+    @staticmethod
+    def get_source(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.")
+            return
+
+        message = update.message.reply_to_message
+        if len(message.photo) == 0:
+            bot.send_message(chat_id=update.message.chat.id, text="I see no picture here.")
+            return
+
+        picture = bot.get_file(file_id=message.photo[0].file_id)
+        picture_data = io.BytesIO()
+        picture.download(out=picture_data)
+        request_url = 'http://saucenao.com/search.php?output_type=2&numres=1&api_key={}'.format(saucenao_token)
+        r = requests.post(request_url, files={'file': ("image.png", picture_data.getvalue())})
+        if r.status_code != 200:
+            bot.send_message(chat_id=update.message.chat.id, text="SauceNao failed me :( HTTP {}".format(r.status_code))
+            return
+
+        result_data = json.JSONDecoder(object_pairs_hook=OrderedDict).decode(r.text)
+        if int(result_data['header']['results_returned']) == 0:
+            bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(")
+            return
+
+        bot.send_message(chat_id=update.message.chat.id, text="Found the source: {}".format(result_data['results'][0]['data']['ext_urls'][0]))
+
 
 # Setup
 token = os.environ['TELEGRAM_BOT_TOKEN']
+saucenao_token = os.environ['SAUCENAO_TOKEN']
 updater = Updater(token=token)
 dispatcher = updater.dispatcher
 
@@ -466,6 +503,7 @@ GreetingHandler(dispatcher)
 GroupInfoHandler(dispatcher)
 RandomHandler(dispatcher)
 RuleHandler(dispatcher)
+SauceNaoHandler(dispatcher)
 
 # Start bot
 updater.start_polling(bootstrap_retries=-1)
