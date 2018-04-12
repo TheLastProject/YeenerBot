@@ -476,7 +476,7 @@ class SauceNaoHandler():
         picture = bot.get_file(file_id=message.photo[0].file_id)
         picture_data = io.BytesIO()
         picture.download(out=picture_data)
-        request_url = 'http://saucenao.com/search.php?output_type=2&numres=1&api_key={}'.format(saucenao_token)
+        request_url = 'https://saucenao.com/search.php?output_type=2&numres=1&api_key={}'.format(saucenao_token)
         r = requests.post(request_url, files={'file': ("image.png", picture_data.getvalue())})
         if r.status_code != 200:
             bot.send_message(chat_id=update.message.chat.id, text="SauceNao failed me :( HTTP {}".format(r.status_code))
@@ -487,7 +487,9 @@ class SauceNaoHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(")
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="Found the source: {}".format(result_data['results'][0]['data']['ext_urls'][0]))
+        results = sorted(result_data['results'], key=lambda result: result['header']['similarity'])
+
+        bot.send_message(chat_id=update.message.chat.id, text="I'm {}% sure this is the source: {}".format(results[-1]['header']['similarity'], results[-1]['data']['ext_urls'][0]))
 
 
 # Setup
