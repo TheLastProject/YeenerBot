@@ -265,7 +265,7 @@ class GroupInfoHandler():
             bot.send_message(chat_id=update.message.chat.id, text="There are no known related chats for this group")
 
     @staticmethod
-    @ensure_creator
+    @ensure_admin
     def set_relatedchats(bot, update):
         group = DB().get_group(update.message.chat.id)
         text = "Related chats set."
