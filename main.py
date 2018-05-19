@@ -483,7 +483,7 @@ class ModerationHandler():
             warnings[str(message.from_user.id)] = []
 
         try:
-            reason = update.message.text.split(' ', 2)[1]
+            reason = update.message.text.split(' ', 1)[1]
         except IndexError:
             reason = None
 
