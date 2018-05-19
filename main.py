@@ -227,9 +227,14 @@ class GreetingHandler():
         if len(members) == 0:
             return
 
+        try:
+            invite_link = Helpers.get_invite_link(bot, update.message.chat)
+        except TelegramError:
+            invite_link = None
+
         data = {'usernames': ", ".join(members),
                 'title': update.message.chat.title,
-                'invite_link': Helpers.get_invite_link(bot, update.message.chat),
+                'invite_link': invite_link,
                 'mods': ", ".join(Helpers.list_mods(update.message.chat)),
                 'description': Helpers.get_description(bot, update.message.chat, group),
                 'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)}
