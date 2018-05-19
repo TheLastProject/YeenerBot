@@ -7,10 +7,12 @@
 #
 # See LICENSE for more information
 
+import datetime
 import io
 import json
 import logging
 import os
+import time
 import random
 
 from collections import OrderedDict
@@ -20,7 +22,7 @@ import dataset
 import requests
 
 from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import Unauthorized
+from telegram.error import Unauthorized, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -68,7 +70,7 @@ class DB():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None, warned=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
@@ -77,10 +79,11 @@ class Group():
         self.relatedchats = relatedchats
         self.bullet = bullet if bullet is not None else random.randint(0,5)
         self.chamber = chamber if chamber is not None else 5
+        self.warned = warned if warned is not None else json.dumps({})
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchats', 'bullet', 'chamber']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchats', 'bullet', 'chamber', 'warned']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -236,6 +239,7 @@ class GreetingHandler():
         bot.send_message(chat_id=update.message.chat_id,
                          text=text.format(**data),
                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]]))
+
 
 class GroupInfoHandler():
     def __init__(self, dispatcher):
@@ -408,6 +412,7 @@ class RandomHandler():
             chambersremaining = 5 - group.chamber
             bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""))
 
+
 class RuleHandler():
     def __init__(self, dispatcher):
         rules_handler = CommandHandler('rules', RuleHandler.send_rules)
@@ -457,6 +462,57 @@ class RuleHandler():
 
         bot.send_message(chat_id=update.message.from_user.id, text=text)
 
+class ModerationHandler():
+    def __init__(self, dispatcher):
+        warn_handler = CommandHandler('warn', ModerationHandler.warn)
+        kick_handler = CommandHandler('kick', ModerationHandler.kick)
+        dispatcher.add_handler(warn_handler)
+        dispatcher.add_handler(kick_handler)
+
+    @staticmethod
+    @ensure_admin
+    def warn(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.")
+            return
+
+        group = DB().get_group(update.message.chat.id)
+        warnings = json.loads(group.warned)
+        message = update.message.reply_to_message
+        if str(message.from_user.id) not in warnings:
+            warnings[str(message.from_user.id)] = []
+
+        try:
+            reason = update.message.text.split(' ', 2)[1]
+        except IndexError:
+            reason = None
+
+        warnings[str(message.from_user.id)].append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        group.warned = json.dumps(warnings)
+        group.save()
+
+        warningtext = "{}, you just received a warning. Here are all warnings since you joined:\n".format(message.from_user.name)
+        for warning in reversed(warnings[str(message.from_user.id)]):
+            try:
+                warnedby = update.message.chat.get_member(warning['warnedby'])
+            except TelegramError:
+                # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
+                continue
+
+            warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
+
+        bot.send_message(chat_id=update.message.chat.id, text=warningtext)
+
+    @staticmethod
+    @ensure_admin
+    def kick(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.")
+            return
+
+        message = update.message.reply_to_message
+        bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+
 class SauceNaoHandler():
     def __init__(self, dispatcher):
         saucenao_handler = CommandHandler('source', SauceNaoHandler.get_source)
@@ -487,7 +543,7 @@ class SauceNaoHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(")
             return
 
-        results = sorted(result_data['results'], key=lambda result: result['header']['similarity'])
+        results = sorted(result_data['results'], key=lambda result: float(result['header']['similarity']))
 
         bot.send_message(chat_id=update.message.chat.id, text="I'm {}% sure this is the source: {}".format(results[-1]['header']['similarity'], results[-1]['data']['ext_urls'][0]))
 
@@ -505,6 +561,7 @@ GreetingHandler(dispatcher)
 GroupInfoHandler(dispatcher)
 RandomHandler(dispatcher)
 RuleHandler(dispatcher)
+ModerationHandler(dispatcher)
 SauceNaoHandler(dispatcher)
 
 # Start bot
