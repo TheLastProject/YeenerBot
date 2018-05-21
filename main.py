@@ -98,7 +98,7 @@ class ErrorHandler():
 
     def handle_error(self, bot, update, error):
         if type(error) == Unauthorized:
-            text = "{}, I don't have permission to PM you. Please click here: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
+            text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
             bot.send_message(chat_id=update.message.chat.id, text=text)
         else:
             text = "Oh no, something went wrong in {}!\n\nError message: {}".format(update.message.chat.title, error)
