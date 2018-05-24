@@ -51,6 +51,10 @@ def ensure_admin(function):
 
     return wrapper
 
+class dict_no_keyerror(dict):
+    def __missing__(self, key):
+        return key
+
 class DB():
     __db = dataset.connect('sqlite:///data.db')
     __group_table = __db['group']
@@ -235,12 +239,12 @@ class GreetingHandler():
         except TelegramError:
             invite_link = None
 
-        data = {'usernames': ", ".join(members),
-                'title': update.message.chat.title,
-                'invite_link': invite_link,
-                'mods': ", ".join(Helpers.list_mods(update.message.chat)),
-                'description': Helpers.get_description(bot, update.message.chat, group),
-                'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)}
+        data = dict_no_keyerror({'usernames': ", ".join(members),
+                                 'title': update.message.chat.title,
+                                 'invite_link': invite_link,
+                                 'mods': ", ".join(Helpers.list_mods(update.message.chat)),
+                                 'description': Helpers.get_description(bot, update.message.chat, group),
+                                 'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)})
 
         text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! Please make sure to read the /rules by pressing the button below."
 
