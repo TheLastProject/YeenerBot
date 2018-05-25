@@ -108,8 +108,8 @@ class ErrorHandler():
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
             bot.send_message(chat_id=update.message.chat.id, text=text)
         else:
-            text = "Oh no, something went wrong in {}!\n\nError message: {}".format(update.message.chat.title, error)
-            bot.send_message(chat_id=Helpers.get_creator(update.message.chat).id, text=text)
+            text = "An error occured: {}".format(error)
+            bot.send_message(chat_id=update.message.chat.id, text=text)
 
 
 class Helpers():
