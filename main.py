@@ -531,7 +531,7 @@ class ModerationHandler():
 
     @staticmethod
     def call_mods(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.name for admin in update.message.chat.get_administrators()), update.message.from_user.name))
+        bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators()), update.message.from_user.name))
 
 class SauceNaoHandler():
     def __init__(self, dispatcher):
