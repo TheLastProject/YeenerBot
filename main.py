@@ -478,8 +478,10 @@ class ModerationHandler():
     def __init__(self, dispatcher):
         warn_handler = CommandHandler('warn', ModerationHandler.warn)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
+        ban_handler = CommandHandler('ban', ModerationHandler.ban)
         dispatcher.add_handler(warn_handler)
         dispatcher.add_handler(kick_handler)
+        dispatcher.add_handler(ban_handler)
 
     @staticmethod
     @ensure_admin
@@ -522,8 +524,48 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.")
             return
 
+        group = DB().get_group(update.message.chat.id)
+        warnings = json.loads(group.warned)
         message = update.message.reply_to_message
+        if str(message.from_user.id) not in warnings:
+            warnings[str(message.from_user.id)] = []
+
+        try:
+            reason = '[KICK] {}'.format(update.message.text.split(' ', 1)[1])
+        except IndexError:
+            reason = '[KICK]'
+
+        warnings[str(message.from_user.id)].append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        group.warned = json.dumps(warnings)
+        group.save()
+
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+
+    @staticmethod
+    @ensure_admin
+    def ban(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to ban the person who wrote it.")
+            return
+
+        group = DB().get_group(update.message.chat.id)
+        warnings = json.loads(group.warned)
+        message = update.message.reply_to_message
+        if str(message.from_user.id) not in warnings:
+            warnings[str(message.from_user.id)] = []
+
+        try:
+            reason = '[BAN] {}'.format(update.message.text.split(' ', 1)[1])
+        except IndexError:
+            reason = '[BAN]'
+
+        warnings[str(message.from_user.id)].append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        group.warned = json.dumps(warnings)
+        group.save()
+
+        bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+
 
 class SauceNaoHandler():
     def __init__(self, dispatcher):
