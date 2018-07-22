@@ -476,16 +476,43 @@ class RuleHandler():
 
 class ModerationHandler():
     def __init__(self, dispatcher):
+        warnings_handler = CommandHandler('warnings', ModerationHandler.warnings)
         warn_handler = CommandHandler('warn', ModerationHandler.warn)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
         ban_handler = CommandHandler('ban', ModerationHandler.ban)
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
+        dispatcher.add_handler(warnings_handler)
         dispatcher.add_handler(warn_handler)
         dispatcher.add_handler(kick_handler)
         dispatcher.add_handler(ban_handler)
         dispatcher.add_handler(call_mods_handler)
         dispatcher.add_handler(call_mods_handler2)
+
+    @staticmethod
+    def warnings(bot, update):
+        if update.message.reply_to_message:
+            message = update.message.reply_to_message
+        else:
+            message = update.message
+
+        group = DB().get_group(update.message.chat.id)
+        warnings = json.loads(group.warned)
+        if str(message.from_user.id) not in warnings:
+            bot.send_message('{} has not received any warnings in this chat.'.format(message.from_user.name))
+            return
+
+        warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
+        for warning in reversed(warnings[str(message.from_user.id)]):
+            try:
+                warnedby = update.message.chat.get_member(warning['warnedby'])
+            except TelegramError:
+                # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
+                continue
+
+            warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
+
+        bot.send_message(chat_id=update.message.chat.id, text=warningtext)
 
     @staticmethod
     @ensure_admin
