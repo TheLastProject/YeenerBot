@@ -479,9 +479,13 @@ class ModerationHandler():
         warn_handler = CommandHandler('warn', ModerationHandler.warn)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
         ban_handler = CommandHandler('ban', ModerationHandler.ban)
+        call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
+        call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
         dispatcher.add_handler(warn_handler)
         dispatcher.add_handler(kick_handler)
         dispatcher.add_handler(ban_handler)
+        dispatcher.add_handler(call_mods_handler)
+        dispatcher.add_handler(call_mods_handler2)
 
     @staticmethod
     @ensure_admin
@@ -565,6 +569,10 @@ class ModerationHandler():
         group.save()
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+
+    @staticmethod
+    def call_mods(bot, update):
+        bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators()), update.message.from_user.name))
 
 
 class SauceNaoHandler():
