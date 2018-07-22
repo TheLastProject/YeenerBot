@@ -499,7 +499,7 @@ class ModerationHandler():
         group = DB().get_group(update.message.chat.id)
         warnings = json.loads(group.warned)
         if str(message.from_user.id) not in warnings:
-            bot.send_message('{} has not received any warnings in this chat.'.format(message.from_user.name))
+            bot.send_message(chat_id=update.message.chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
