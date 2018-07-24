@@ -59,8 +59,9 @@ def resolve_chat(function):
 
         user = update.message.from_user
         chats = []
-        for chat in [bot.get_chat(group.group_id) for group in DB.get_all_groups()]:
+        for group in DB.get_all_groups():
             try:
+                chat = bot.get_chat(group.group_id)
                 chat.get_member(user.id)
                 chats.append(chat)
             except TelegramError:
