@@ -62,7 +62,8 @@ def resolve_chat(function):
         for group in DB.get_all_groups():
             try:
                 chat = bot.get_chat(group.group_id)
-                chat.get_member(user.id)
+                if not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
+                    continue
                 chats.append(chat)
             except TelegramError:
                 continue
