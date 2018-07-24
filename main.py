@@ -60,15 +60,18 @@ def resolve_chat(function):
         user = update.message.from_user
         chats = []
         for chat in [bot.get_chat(group.group_id) for group in DB.get_all_groups()]:
-            if user in [admin.user for admin in chat.get_administrators()]:
+            try:
+                chat.get_member(user.id)
                 chats.append(chat)
+            except TelegramError:
+                continue
 
         if len(chats) == 0:
             bot.send_message(chat_id=update.message.chat_id, text="You do not moderate any chats known to me.")
             return
 
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data="{}_{}".format(chat.id, update.message.text))] for chat in chats])
-        bot.send_message(chat_id=update.message.chat_id, text="Execute action on which chat?", reply_markup=keyboard)
+        bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard)
 
     return wrapper
 
@@ -496,6 +499,7 @@ class RuleHandler():
         bot.send_message(chat_id=update.message.chat_id, text=text)
 
     @staticmethod
+    @resolve_chat
     def send_rules(bot, update):
         # Notify owner
         try:
