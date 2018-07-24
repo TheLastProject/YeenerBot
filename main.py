@@ -1,4 +1,5 @@
 #!/usr/env/python3
+# coding=utf-8
 #
 # This file is part of YeenerBot, licensed under MIT
 #
@@ -21,7 +22,7 @@ from distutils.util import strtobool
 import dataset
 import requests
 
-from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import Unauthorized, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
@@ -51,6 +52,26 @@ def ensure_admin(function):
 
     return wrapper
 
+def resolve_chat(function):
+    def wrapper(bot, update, **optional_args):
+        if update.message.chat.type != 'private':
+            return function(bot=bot, update=update, **optional_args)
+
+        user = update.message.from_user
+        chats = []
+        for chat in [bot.get_chat(group.group_id) for group in DB.get_all_groups()]:
+            if user in [admin.user for admin in chat.get_administrators()]:
+                chats.append(chat)
+
+        if len(chats) == 0:
+            bot.send_message(chat_id=update.message.chat_id, text="You do not moderate any chats known to me.")
+            return
+
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data="{}_{}".format(chat.id, update.message.text))] for chat in chats])
+        bot.send_message(chat_id=update.message.chat_id, text="Execute action on which chat?", reply_markup=keyboard)
+
+    return wrapper
+
 class dict_no_keyerror(dict):
     def __missing__(self, key):
         return key
@@ -67,6 +88,15 @@ class DB():
 
         filtered_group_data = {_key: group_data[_key] for _key in Group.get_keys() if _key in group_data}
         return Group(**filtered_group_data)
+
+    @staticmethod
+    def get_all_groups():
+        groups = []
+        for group_data in DB().__group_table.all():
+            filtered_group_data = {_key: group_data[_key] for _key in Group.get_keys() if _key in group_data}
+            groups.append(Group(**filtered_group_data))
+
+        return groups
 
     @staticmethod
     def update_group(group):
@@ -152,6 +182,18 @@ class Helpers():
 
         return chat.invite_link
 
+class CallbackHandler():
+    def __init__(self, dispatcher):
+        callback_handler = CallbackQueryHandler(CallbackHandler.handle, pass_update_queue=True)
+        dispatcher.add_handler(callback_handler)
+
+    @staticmethod
+    def handle(bot, update, update_queue):
+        chat_id, command = update.callback_query.data.split('_', 1)
+        message = Message(message_id=update.update_id, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot)
+        update_queue.put(Update(update_id=update.update_id, message=message))
+        update.callback_query.answer(text='Sent {} to {}'.format(command, bot.get_chat(chat_id).title))
+
 
 class DebugHandler():
     def __init__(self, dispatcher):
@@ -193,6 +235,7 @@ class GreetingHandler():
             RuleHandler.send_rules(bot, update)
 
     @staticmethod
+    @resolve_chat
     @ensure_admin
     def set_welcome(bot, update):
         group = DB().get_group(update.message.chat.id)
@@ -208,6 +251,7 @@ class GreetingHandler():
         bot.send_message(chat_id=update.message.chat_id, text=text)
 
     @staticmethod
+    @resolve_chat
     @ensure_admin
     def toggle_welcome(bot, update):
         group = DB().get_group(update.message.chat.id)
@@ -277,6 +321,7 @@ class GroupInfoHandler():
             bot.send_message(chat_id=update.message.chat.id, text="There are no known related chats for this group")
 
     @staticmethod
+    @resolve_chat
     @ensure_admin
     def set_relatedchats(bot, update):
         group = DB().get_group(update.message.chat.id)
@@ -297,6 +342,7 @@ class GroupInfoHandler():
         bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, Helpers.get_description(bot, update.message.chat, group)))
 
     @staticmethod
+    @resolve_chat
     @ensure_creator
     def set_description(bot, update):
         group = DB().get_group(update.message.chat.id)
@@ -321,6 +367,7 @@ class GroupInfoHandler():
         bot.send_message(chat_id=update.message.chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
 
     @staticmethod
+    @resolve_chat
     @ensure_creator
     def revokeinvitelink(bot, update):
         bot.export_chat_invite_link(update.message.chat.id)
@@ -433,6 +480,7 @@ class RuleHandler():
         dispatcher.add_handler(setrules_handler)
 
     @staticmethod
+    @resolve_chat
     @ensure_admin
     def set_rules(bot, update):
         group = DB().get_group(update.message.chat.id)
@@ -490,6 +538,7 @@ class ModerationHandler():
         dispatcher.add_handler(call_mods_handler2)
 
     @staticmethod
+    @resolve_chat
     def warnings(bot, update):
         if update.message.reply_to_message:
             message = update.message.reply_to_message
@@ -645,6 +694,7 @@ dispatcher = updater.dispatcher
 
 # Initialize handler
 ErrorHandler(dispatcher)
+CallbackHandler(dispatcher)
 DebugHandler(dispatcher)
 GreetingHandler(dispatcher)
 GroupInfoHandler(dispatcher)
