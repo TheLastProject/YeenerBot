@@ -539,6 +539,7 @@ class ModerationHandler():
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
         dispatcher.add_handler(warnings_handler)
         dispatcher.add_handler(warn_handler)
+        dispatcher.add_handler(clearwarnings_handler)
         dispatcher.add_handler(kick_handler)
         dispatcher.add_handler(ban_handler)
         dispatcher.add_handler(call_mods_handler)
