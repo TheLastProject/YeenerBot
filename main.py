@@ -532,6 +532,7 @@ class ModerationHandler():
     def __init__(self, dispatcher):
         warnings_handler = CommandHandler('warnings', ModerationHandler.warnings)
         warn_handler = CommandHandler('warn', ModerationHandler.warn)
+        clearwarnings_handler = CommandHandler('clearwarnings', ModerationHandler.clearwarnings)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
         ban_handler = CommandHandler('ban', ModerationHandler.ban)
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
@@ -602,6 +603,22 @@ class ModerationHandler():
             warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
         bot.send_message(chat_id=update.message.chat.id, text=warningtext)
+
+    @staticmethod
+    @ensure_admin
+    def clearwarnings(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to clear the warnings of the person who wrote it.")
+            return
+
+        group = DB().get_group(update.message.chat.id)
+        warnings = json.loads(group.warned)
+        message = update.message.reply_to_message
+        warnings[str(message.from_user.id)] = []
+        group.warned = json.dumps(warnings)
+        group.save()
+
+        bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name))
 
     @staticmethod
     @ensure_admin
