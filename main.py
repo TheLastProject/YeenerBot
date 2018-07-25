@@ -199,8 +199,8 @@ class CallbackHandler():
     @staticmethod
     def handle(bot, update, update_queue):
         chat_id, command = update.callback_query.data.split('_', 1)
-        message = Message(message_id=update.update_id, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot)
-        update_queue.put(Update(update_id=update.update_id, message=message))
+        message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot)
+        update_queue.put(Update(update_id=-1, message=message))
         update.callback_query.answer(text='Sent {} to {}'.format(command, bot.get_chat(chat_id).title))
 
 
@@ -247,6 +247,8 @@ class GreetingHandler():
     @resolve_chat
     @ensure_admin
     def set_welcome(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         group = DB().get_group(update.message.chat.id)
         text = "Welcome message set."
         try:
@@ -257,24 +259,26 @@ class GreetingHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text=text)
+        bot.send_message(chat_id=target_chat, text=text)
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def toggle_welcome(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         group = DB().get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.message.chat_id, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled))
+            bot.send_message(chat_id=target_chat, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled))
             return
 
         group.welcome_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text="Welcome: {}".format(str(enabled)))
+        bot.send_message(chat_id=target_chat, text="Welcome: {}".format(str(enabled)))
 
     @staticmethod
     def welcome(bot, update):
@@ -322,17 +326,22 @@ class GroupInfoHandler():
         dispatcher.add_handler(revokeinvitelink_handler)
 
     @staticmethod
+    @resolve_chat
     def relatedchats(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         group = DB().get_group(update.message.chat.id)
         if group.relatedchats:
             bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\nRelated chats:\n{}".format(update.message.chat.title, group.relatedchats))
         else:
-            bot.send_message(chat_id=update.message.chat.id, text="There are no known related chats for this group")
+            bot.send_message(chat_id=target_chat, text="There are no known related chats for this group")
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def set_relatedchats(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         group = DB().get_group(update.message.chat.id)
         text = "Related chats set."
         try:
@@ -343,9 +352,10 @@ class GroupInfoHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text=text)
+        bot.send_message(chat_id=target_chat, text=text)
 
     @staticmethod
+    @resolve_chat
     def description(bot, update):
         group = DB().get_group(update.message.chat.id)
         bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, Helpers.get_description(bot, update.message.chat, group)))
@@ -354,6 +364,8 @@ class GroupInfoHandler():
     @resolve_chat
     @ensure_creator
     def set_description(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         group = DB().get_group(update.message.chat.id)
         text = "Description set."
         try:
@@ -364,23 +376,28 @@ class GroupInfoHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text=text)
+        bot.send_message(chat_id=target_chat, text=text)
 
     @staticmethod
+    @resolve_chat
     def invitelink(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
-            bot.send_message(chat_id=update.message.chat.id, text="{} does not have an invite link".format(update.message.chat.title))
+            bot.send_message(chat_id=target_chat, text="{} does not have an invite link".format(update.message.chat.title))
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
+        bot.send_message(chat_id=target_chat, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
 
     @staticmethod
     @resolve_chat
     @ensure_creator
     def revokeinvitelink(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         bot.export_chat_invite_link(update.message.chat.id)
-        bot.send_message(chat_id=update.message.chat.id, text="Invite link for {} revoked".format(update.message.chat.title))
+        bot.send_message(chat_id=target_chat, text="Invite link for {} revoked".format(update.message.chat.title))
 
 
 class RandomHandler():
@@ -492,6 +509,8 @@ class RuleHandler():
     @resolve_chat
     @ensure_admin
     def set_rules(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         group = DB().get_group(update.message.chat.id)
         text = "Rules set."
         try:
@@ -502,11 +521,13 @@ class RuleHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text=text)
+        bot.send_message(chat_id=target_chat, text=text)
 
     @staticmethod
     @resolve_chat
     def send_rules(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         # Notify owner
         try:
             bot.send_message(chat_id=Helpers.get_creator(update.message.chat).id, text="{} just requested the rules for {}.".format(update.message.from_user.name, update.message.chat.title))
@@ -516,7 +537,7 @@ class RuleHandler():
         group = DB().get_group(update.message.chat.id)
 
         if not group.rules:
-            bot.send_message(chat_id=update.message.chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
+            bot.send_message(chat_id=target_chat, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
 
         text = "{}\n\n".format(update.message.chat.title)
@@ -552,6 +573,8 @@ class ModerationHandler():
     @staticmethod
     @resolve_chat
     def warnings(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         if update.message.reply_to_message:
             message = update.message.reply_to_message
         else:
@@ -560,7 +583,7 @@ class ModerationHandler():
         group = DB().get_group(update.message.chat.id)
         warnings = json.loads(group.warned)
         if str(message.from_user.id) not in warnings:
-            bot.send_message(chat_id=update.message.chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
+            bot.send_message(chat_id=target_chat, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
@@ -573,7 +596,7 @@ class ModerationHandler():
 
             warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
-        bot.send_message(chat_id=update.message.chat.id, text=warningtext)
+        bot.send_message(chat_id=target_chat, text=warningtext)
 
     @staticmethod
     @ensure_admin
