@@ -75,10 +75,11 @@ def resolve_chat(function):
                 continue
 
         if len(chats) == 0:
-            bot.send_message(chat_id=update.message.chat_id, text="You do not moderate any chats known to me.")
+            bot.send_message(chat_id=update.message.chat_id, text="You are not in any chats known to me.")
             return
 
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data="{}_{}".format(chat.id, update.message.text))] for chat in chats])
+        MessageCache.messages[update.message.chat_id] = update.message
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data=chat.id)] for chat in chats])
         bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard)
 
     return wrapper
@@ -113,6 +114,8 @@ class DB():
     def update_group(group):
         DB().__group_table.upsert(group.serialize(), ['group_id'])
 
+class MessageCache():
+    messages = {}
 
 class Group():
     def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None, warned=None):
@@ -200,7 +203,14 @@ class CallbackHandler():
 
     @staticmethod
     def handle(bot, update, update_queue):
-        chat_id, command = update.callback_query.data.split('_', 1)
+        update.callback_query.message.delete()
+        chat_id = update.callback_query.data
+        try:
+            command = MessageCache.messages.pop(update.callback_query.from_user.id).text
+        except KeyError:
+            update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the command and choosing the chat to send it to.")
+            return
+
         message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot)
         update_queue.put(Update(update_id=-1, message=message))
         update.callback_query.answer(text='Sent {} to {}'.format(command, bot.get_chat(chat_id).title))
