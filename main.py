@@ -33,7 +33,8 @@ def ensure_creator(function):
     def wrapper(bot, update, **optional_args):
         member = update.message.chat.get_member(update.message.from_user.id)
         if member.status != 'creator':
-            bot.send_message(chat_id=update.message.chat_id, text="You do not have the required permission to do this.")
+            target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+            bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
             return
 
         return function(bot=bot, update=update, **optional_args)
@@ -45,7 +46,8 @@ def ensure_admin(function):
     def wrapper(bot, update, **optional_args):
         member = update.message.chat.get_member(update.message.from_user.id)
         if member.status not in ['creator', 'administrator']:
-            bot.send_message(chat_id=update.message.chat_id, text="You do not have the required permission to do this.")
+            target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+            bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
             return
 
         return function(bot=bot, update=update, **optional_args)
