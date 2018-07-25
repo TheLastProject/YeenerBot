@@ -37,6 +37,13 @@ def ensure_creator(function):
             bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
             return
 
+        if update.message.text.split(' ', 1)[0] != '/auditlog':
+            group = DB().get_group(update.message.chat.id)
+            auditlog = json.loads(group.auditlog)
+            auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text})
+            group.auditlog = json.dumps(auditlog)
+            group.save()
+
         return function(bot=bot, update=update, **optional_args)
 
     return wrapper
@@ -49,6 +56,13 @@ def ensure_admin(function):
             target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
             bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
             return
+
+        if update.message.text.split(' ', 1)[0] != '/auditlog':
+            group = DB().get_group(update.message.chat.id)
+            auditlog = json.loads(group.auditlog)
+            auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text})
+            group.auditlog = json.dumps(auditlog)
+            group.save()
 
         return function(bot=bot, update=update, **optional_args)
 
@@ -118,7 +132,7 @@ class MessageCache():
     messages = {}
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None, warned=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None, warned=None, auditlog=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
@@ -128,15 +142,21 @@ class Group():
         self.bullet = bullet if bullet is not None else random.randint(0,5)
         self.chamber = chamber if chamber is not None else 5
         self.warned = warned if warned is not None else json.dumps({})
+        self.auditlog = auditlog if auditlog is not None else json.dumps([])
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchats', 'bullet', 'chamber', 'warned']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchats', 'bullet', 'chamber', 'warned', 'auditlog']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
 
     def save(self):
+        auditlog = json.loads(self.auditlog)
+        while len(auditlog) > 25:
+            auditlog.pop()
+        self.auditlog = json.dumps(auditlog)
+
         DB.update_group(self)
 
 
@@ -567,6 +587,7 @@ class RuleHandler():
 
 class ModerationHandler():
     def __init__(self, dispatcher):
+        auditlog_handler = CommandHandler('auditlog', ModerationHandler.auditlog)
         warnings_handler = CommandHandler('warnings', ModerationHandler.warnings)
         warn_handler = CommandHandler('warn', ModerationHandler.warn)
         clearwarnings_handler = CommandHandler('clearwarnings', ModerationHandler.clearwarnings)
@@ -575,6 +596,7 @@ class ModerationHandler():
         say_handler = CommandHandler('say', ModerationHandler.say)
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
+        dispatcher.add_handler(auditlog_handler)
         dispatcher.add_handler(warnings_handler)
         dispatcher.add_handler(warn_handler)
         dispatcher.add_handler(clearwarnings_handler)
@@ -583,6 +605,28 @@ class ModerationHandler():
         dispatcher.add_handler(say_handler)
         dispatcher.add_handler(call_mods_handler)
         dispatcher.add_handler(call_mods_handler2)
+
+    @staticmethod
+    @resolve_chat
+    @ensure_admin
+    def auditlog(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        auditlog = json.loads(group.auditlog)
+        if len(auditlog) == 0:
+            bot.send_message(chat_id=update.message.from_user.id, text="No admin actions have been logged in this chat yet.")
+
+        audittext = "{} most recent admin events:".format(len(auditlog))
+        for auditentry in reversed(auditlog):
+            try:
+                member = update.message.chat.get_member(auditentry['user'])
+            except TelegramError:
+                # If we can't find the user in the chat anymore, assume they're no longer a mod.
+                continue
+
+            audittext += "\n[{}] {}: {}".format(str(datetime.datetime.fromtimestamp(auditentry['timestamp'])).split(".")[0], member.user.name, auditentry['command'])
+
+        bot.send_message(chat_id=update.message.from_user.id, text=audittext)
+
 
     @staticmethod
     @resolve_chat
