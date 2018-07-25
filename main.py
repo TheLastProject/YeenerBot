@@ -562,6 +562,7 @@ class ModerationHandler():
         clearwarnings_handler = CommandHandler('clearwarnings', ModerationHandler.clearwarnings)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
         ban_handler = CommandHandler('ban', ModerationHandler.ban)
+        say_handler = CommandHandler('say', ModerationHandler.say)
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
         dispatcher.add_handler(warnings_handler)
@@ -569,6 +570,7 @@ class ModerationHandler():
         dispatcher.add_handler(clearwarnings_handler)
         dispatcher.add_handler(kick_handler)
         dispatcher.add_handler(ban_handler)
+        dispatcher.add_handler(say_handler)
         dispatcher.add_handler(call_mods_handler)
         dispatcher.add_handler(call_mods_handler2)
 
@@ -698,6 +700,12 @@ class ModerationHandler():
         group.save()
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+
+    @staticmethod
+    @resolve_chat
+    @ensure_admin
+    def say(bot, update):
+        bot.send_message(chat_id=update.message.chat_id, text=" ".join(update.message.text.split(' ')[1:]))
 
     @staticmethod
     def call_mods(bot, update):
