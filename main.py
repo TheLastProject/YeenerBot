@@ -614,6 +614,7 @@ class ModerationHandler():
         auditlog = json.loads(group.auditlog)
         if len(auditlog) == 0:
             bot.send_message(chat_id=update.message.from_user.id, text="No admin actions have been logged in this chat yet.")
+            return
 
         audittext = "{} most recent admin events:".format(len(auditlog))
         for auditentry in reversed(auditlog):
