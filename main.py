@@ -102,6 +102,18 @@ class dict_no_keyerror(dict):
     def __missing__(self, key):
         return key
 
+class SupportsFilter():
+    types = {}
+
+    @staticmethod
+    def add_support(command, telegramFilter):
+        if not telegramFilter in SupportsFilter.types:
+            SupportsFilter.types[telegramFilter] = []
+
+        if not command in SupportsFilter.types[telegramFilter]:
+            SupportsFilter.types[telegramFilter].append(command)
+
+
 class DB():
     __db = dataset.connect('sqlite:///data.db')
     __group_table = __db['group']
@@ -218,22 +230,62 @@ class Helpers():
 
 class CallbackHandler():
     def __init__(self, dispatcher):
-        callback_handler = CallbackQueryHandler(CallbackHandler.handle, pass_update_queue=True)
+        callback_handler = CallbackQueryHandler(CallbackHandler.handle_callback, pass_update_queue=True)
+        message_handler = MessageHandler(Filters.private, CallbackHandler.handle_message)
         dispatcher.add_handler(callback_handler)
+        dispatcher.add_handler(message_handler, 99999) # Lowest possible priority
 
     @staticmethod
-    def handle(bot, update, update_queue):
+    def handle_callback(bot, update, update_queue):
+        reply_to_message = None
+
         update.callback_query.message.delete()
-        chat_id = update.callback_query.data
-        try:
-            command = MessageCache.messages.pop(update.callback_query.from_user.id).text
-        except KeyError:
-            update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the command and choosing the chat to send it to.")
+        if '_' in update.callback_query.data:
+            chat_id, command = update.callback_query.data.split('_', 1)
+            try:
+                reply_to_message = MessageCache.messages.pop(update.callback_query.from_user.id)
+            except KeyError:
+                update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the content and choosing the command to run on it.")
+                return
+        else:
+            chat_id = update.callback_query.data
+            try:
+                command = MessageCache.messages.pop(update.callback_query.from_user.id).text
+            except KeyError:
+                update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the command and choosing the chat to send it to.")
+                return
+
+        message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot, reply_to_message=reply_to_message)
+        update_queue.put(Update(update_id=-1, message=message))
+        if reply_to_message:
+            update.callback_query.answer(text='Executing {} on message'.format(command))
+        else:
+            update.callback_query.answer(text='Sent {} to {}'.format(command, bot.get_chat(chat_id).title))
+
+    @staticmethod
+    def handle_message(bot, update):
+        if update.update_id == -1:
             return
 
-        message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot)
-        update_queue.put(Update(update_id=-1, message=message))
-        update.callback_query.answer(text='Sent {} to {}'.format(command, bot.get_chat(chat_id).title))
+        supported_commands = []
+
+        if update.message.forward_from and Filters.forwarded in SupportsFilter.types:
+            for supported_command in SupportsFilter.types[Filters.forwarded]:
+                if supported_command not in supported_commands:
+                    supported_commands.append(supported_command)
+
+        if update.message.photo and Filters.photo in SupportsFilter.types:
+            for supported_command in SupportsFilter.types[Filters.photo]:
+                if supported_command not in supported_commands:
+                    supported_commands.append(supported_command)
+
+        if len(supported_commands) == 0:
+            bot.send_message(chat_id=update.message.chat_id, text="I don't know what to do with this message.")
+            return
+
+        MessageCache.messages[update.message.chat_id] = update.message
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('/{}'.format(command), callback_data='{}_/{}'.format(update.message.chat.id, command))] for command in supported_commands])
+        bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard)
 
 
 class DebugHandler():
@@ -589,10 +641,15 @@ class ModerationHandler():
     def __init__(self, dispatcher):
         auditlog_handler = CommandHandler('auditlog', ModerationHandler.auditlog)
         warnings_handler = CommandHandler('warnings', ModerationHandler.warnings)
+        SupportsFilter.add_support('warnings', Filters.forwarded)
         warn_handler = CommandHandler('warn', ModerationHandler.warn)
+        SupportsFilter.add_support('warn', Filters.forwarded)
         clearwarnings_handler = CommandHandler('clearwarnings', ModerationHandler.clearwarnings)
+        SupportsFilter.add_support('clearwarnings', Filters.forwarded)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
+        SupportsFilter.add_support('kick', Filters.forwarded)
         ban_handler = CommandHandler('ban', ModerationHandler.ban)
+        SupportsFilter.add_support('ban', Filters.forwarded)
         say_handler = CommandHandler('say', ModerationHandler.say)
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
@@ -770,6 +827,7 @@ class ModerationHandler():
 class SauceNaoHandler():
     def __init__(self, dispatcher):
         saucenao_handler = CommandHandler('source', SauceNaoHandler.get_source)
+        SupportsFilter.add_support('source', Filters.photo)
         dispatcher.add_handler(saucenao_handler)
 
     @staticmethod
