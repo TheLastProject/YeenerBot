@@ -280,7 +280,6 @@ class CallbackHandler():
                     supported_commands.append(supported_command)
 
         if len(supported_commands) == 0:
-            bot.send_message(chat_id=update.message.chat_id, text="I don't know what to do with this message.")
             return
 
         MessageCache.messages[update.message.chat_id] = update.message
