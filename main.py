@@ -506,8 +506,8 @@ class RandomHandler():
             bot.send_message(chat_id=update.message.chat_id, text="Very funny.")
             return
 
-        if dice[0] >= 1000 or dice[1] >= 1000:
-            bot.send_message(chat_id=update.message.chat_id, text="Sorry, but I'm limited to 999d999.")
+        if dice[0] > 100 or dice[1] > 100:
+            bot.send_message(chat_id=update.message.chat_id, text="Sorry, but I'm limited to 100d100.")
             return
 
         if dice[0] == 1:
@@ -840,7 +840,7 @@ class SauceNaoHandler():
             bot.send_message(chat_id=update.message.chat.id, text="I see no picture here.")
             return
 
-        picture = bot.get_file(file_id=message.photo[0].file_id)
+        picture = bot.get_file(file_id=message.photo[-1].file_id)
         picture_data = io.BytesIO()
         picture.download(out=picture_data)
         request_url = 'https://saucenao.com/search.php?output_type=2&numres=1&api_key={}'.format(saucenao_token)
