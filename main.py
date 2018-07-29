@@ -570,9 +570,13 @@ class RandomHandler():
             group.bullet = random.randint(0,5)
             group.chamber = 5
             group.save()
+            if update.message.chat.type == 'private':
+                return
+
             for admin in update.message.chat.get_administrators():
                 if admin.user.id == update.message.from_user.id:
                     return
+            
             bot.send_message(chat_id=update.message.from_user.id, text = Helpers.get_invite_link(bot, update.message.chat))
             bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
             bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
