@@ -180,12 +180,14 @@ class ErrorHandler():
         if not update:
             return
 
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
         if type(error) == Unauthorized:
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
-            bot.send_message(chat_id=update.message.chat.id, text=text)
+            bot.send_message(chat_id=target_chat, text=text)
         else:
             text = "An error occured: {}".format(error)
-            bot.send_message(chat_id=update.message.chat.id, text=text)
+            bot.send_message(chat_id=target_chat, text=text)
 
 
 class Helpers():
