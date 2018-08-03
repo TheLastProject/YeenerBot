@@ -93,7 +93,10 @@ def resolve_chat(function):
             return
 
         MessageCache.messages[update.message.chat_id] = update.message
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data=chat.id)] for chat in chats])
+        keyboard_buttons = [InlineKeyboardButton("[ALL CHATS]", callback_data=-1)]
+        for chat in chats:
+            keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
+        keyboard = InlineKeyboardMarkup([keyboard_buttons])
         bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard)
 
     return wrapper
@@ -257,12 +260,31 @@ class CallbackHandler():
                 update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the command and choosing the chat to send it to.")
                 return
 
-        message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=bot.get_chat(chat_id), text=command, bot=bot, reply_to_message=reply_to_message)
-        update_queue.put(Update(update_id=-1, message=message))
-        if reply_to_message:
-            update.callback_query.answer(text='Executing {} on message'.format(command))
+        # We use -1 for "all chats"
+        chats = []
+        if chat_id == str(-1):
+            for group in DB.get_all_groups():
+                try:
+                    chat = bot.get_chat(group.group_id)
+                    if chat.type == 'private':
+                        continue
+
+                    if not chat.get_member(update.callback_query.from_user.id).status in ['creator', 'administrator', 'member']:
+                        continue
+
+                    chats.append(chat)
+                except TelegramError:
+                    continue
         else:
-            update.callback_query.answer(text='Sent {} to {}'.format(command, bot.get_chat(chat_id).title))
+            chats = [bot.get_chat(chat_id)]
+
+        for chat in chats:
+            message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=bot, reply_to_message=reply_to_message)
+            update_queue.put(Update(update_id=-1, message=message))
+            if reply_to_message:
+                update.callback_query.answer(text='Executing {} on message'.format(command))
+            else:
+                update.callback_query.answer(text='Sent {} to {}'.format(command, chat.title))
 
     @staticmethod
     def handle_message(bot, update):
@@ -678,7 +700,7 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.from_user.id, text="No admin actions have been logged in this chat yet.")
             return
 
-        audittext = "{} most recent admin events:".format(len(auditlog))
+        audittext = "{} most recent admin events in {}:".format(len(auditlog), update.message.chat.title)
         for auditentry in reversed(auditlog):
             try:
                 member = update.message.chat.get_member(auditentry['user'])
