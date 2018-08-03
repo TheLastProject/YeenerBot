@@ -96,7 +96,7 @@ def resolve_chat(function):
         keyboard_buttons = [InlineKeyboardButton("[ALL CHATS]", callback_data=-1)]
         for chat in chats:
             keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
-        keyboard = InlineKeyboardMarkup([keyboard_buttons])
+        keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
         bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard)
 
     return wrapper
@@ -281,10 +281,11 @@ class CallbackHandler():
         for chat in chats:
             message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=bot, reply_to_message=reply_to_message)
             update_queue.put(Update(update_id=-1, message=message))
-            if reply_to_message:
-                update.callback_query.answer(text='Executing {} on message'.format(command))
-            else:
-                update.callback_query.answer(text='Sent {} to {}'.format(command, chat.title))
+
+        if reply_to_message:
+            update.callback_query.answer(text='Executing {} on message'.format(command))
+        else:
+            update.callback_query.answer(text='Sent {} to {}'.format(command, chats[0].title if chat_id != str(-1) else "all chats"))
 
     @staticmethod
     def handle_message(bot, update):
