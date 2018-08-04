@@ -147,13 +147,13 @@ class MessageCache():
     messages = {}
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchats=None, bullet=None, chamber=None, warned=None, auditlog=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
         self.description = description
         self.rules = rules
-        self.relatedchats = relatedchats
+        self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
         self.bullet = bullet if bullet is not None else random.randint(0,5)
         self.chamber = chamber if chamber is not None else 5
         self.warned = warned if warned is not None else json.dumps({})
@@ -161,7 +161,7 @@ class Group():
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchats', 'bullet', 'chamber', 'warned', 'auditlog']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -227,7 +227,6 @@ class Helpers():
 
     @staticmethod
     def get_invite_link(bot, chat):
-        chat = bot.get_chat(chat.id)
         if not chat.invite_link:
             chat.invite_link = bot.export_chat_invite_link(chat.id)
 
@@ -250,8 +249,7 @@ class CallbackHandler():
             try:
                 reply_to_message = MessageCache.messages.pop(update.callback_query.from_user.id)
             except KeyError:
-                update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the content and choosing the command to run on it.")
-                return
+                pass
         else:
             chat_id = update.callback_query.data
             try:
@@ -423,13 +421,15 @@ class GroupInfoHandler():
         description_handler = CommandHandler('description', GroupInfoHandler.description)
         setdescription_handler = CommandHandler('setdescription', GroupInfoHandler.set_description)
         relatedchats_handler = CommandHandler('relatedchats', GroupInfoHandler.relatedchats)
-        setrelatedchats_handler = CommandHandler('setrelatedchats', GroupInfoHandler.set_relatedchats)
+        addrelatedchat_handler = CommandHandler('addrelatedchat', GroupInfoHandler.add_relatedchat)
+        removerelatedchat_handler = CommandHandler('removerelatedchat', GroupInfoHandler.remove_relatedchat)
         invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
         revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupInfoHandler.revokeinvitelink)
         dispatcher.add_handler(description_handler)
         dispatcher.add_handler(setdescription_handler)
         dispatcher.add_handler(relatedchats_handler)
-        dispatcher.add_handler(setrelatedchats_handler)
+        dispatcher.add_handler(addrelatedchat_handler)
+        dispatcher.add_handler(removerelatedchat_handler)
         dispatcher.add_handler(invitelink_handler)
         dispatcher.add_handler(revokeinvitelink_handler)
 
@@ -439,28 +439,106 @@ class GroupInfoHandler():
         target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
 
         group = DB().get_group(update.message.chat.id)
-        if group.relatedchats:
-            bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\nRelated chats:\n{}".format(update.message.chat.title, group.relatedchats))
+        relatedchat_ids = json.loads(group.relatedchat_ids)
+        if relatedchat_ids:
+            message = "{}\n\nRelated chats:".format(update.message.chat.title)
+            for relatedchat_id in relatedchat_ids:
+                try:
+                    group = DB().get_group(relatedchat_id)
+                    relatedchat = bot.get_chat(group.group_id)
+                    try:
+                        description = Helpers.get_description(bot, relatedchat, group)
+                    except TelegramError:
+                        description = "No description"
+
+                    try:
+                        invitelink = Helpers.get_invite_link(bot, relatedchat)
+                    except TelegramError:
+                        invitelink = "No invite link available"
+
+                    message += "\n{}\n\n{}\n\n{}".format(relatedchat.title, description, invitelink)
+                except TelegramError:
+                    continue
+
+            bot.send_message(chat_id=target_chat, text=message)
         else:
-            bot.send_message(chat_id=target_chat, text="There are no known related chats for this group")
+            bot.send_message(chat_id=target_chat, text="There are no known related chats for {}".format(update.message.chat.title))
 
     @staticmethod
     @resolve_chat
     @ensure_admin
-    def set_relatedchats(bot, update):
+    def add_relatedchat(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
+        chat_ids = update.message.text.split(' ')[1:]
+        if len(chat_ids) == 0:
+            chats = []
+            for group in DB.get_all_groups():
+                try:
+                    chat = bot.get_chat(group.group_id)
+                    if chat.type == 'private':
+                        continue
+
+                    if not chat.get_member(update.message.from_user.id).status in ['creator', 'administrator', 'member']:
+                        continue
+
+                    chats.append(chat)
+                except TelegramError:
+                    continue
+
+            if len(chats) == 0:
+                bot.send_message(chat_id=target_chat, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
+                return
+
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/addrelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
+            bot.send_message(chat_id=target_chat, text="Add which chat as a related chat?", reply_markup=keyboard)
+            return
+
+        group = DB().get_group(update.message.chat.id)
+        relatedchat_ids = json.loads(group.relatedchat_ids)
+        for chat_id in chat_ids:
+            if chat_id not in relatedchat_ids:
+                relatedchat_ids.append(chat_id)
+
+        group.relatedchat_ids = json.dumps(relatedchat_ids)
+        group.save()
+
+    @staticmethod
+    @resolve_chat
+    @ensure_admin
+    def remove_relatedchat(bot, update):
         target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
 
         group = DB().get_group(update.message.chat.id)
-        text = "Related chats set."
-        try:
-            group.relatedchats = update.message.text.split(' ', 1)[1]
-        except IndexError:
-            group.relatedchats = None
-            text = "Related chats cleared."
+        relatedchat_ids = json.loads(group.relatedchat_ids)
+        chat_ids = update.message.text.split(' ', 1)[1:]
+        if len(chat_ids) == 0:
+            chats = []
+            for chat_id in relatedchat_ids:
+                try:
+                    chat = bot.get_chat(chat_id)
+                    chats.append(chat)
+                except TelegramError:
+                    # Bugged chat? Remove right here
+                    relatedchat_ids.remove(chat_id)
+                    group.relatedchat_ids = json.dumps(relatedchat_ids)
+                    group.save()
 
+            if len(chats) > 0:
+                keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/removerelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
+                bot.send_message(chat_id=target_chat, text="Remove which chat from related chats?", reply_markup=keyboard)
+            else:
+                bot.send_message(chat_id=target_chat, text="There are no known related chats for {}".format(update.message.chat.title))
+            return
+
+        for chat_id in chat_ids:
+            try:
+                relatedchat_ids.remove(chat_id)
+            except ValueError:
+                pass
+
+        group.relatedchat_ids = json.dumps(relatedchat_ids)
         group.save()
-
-        bot.send_message(chat_id=target_chat, text=text)
 
     @staticmethod
     @resolve_chat
@@ -660,8 +738,23 @@ class RuleHandler():
         text += "The group rules are:\n{}\n\n".format(group.rules)
         text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
 
-        if group.relatedchats:
-            text += "\n\nRelated chats:\n{}".format(group.relatedchats)
+        relatedchat_ids = json.loads(group.relatedchat_ids)
+        if relatedchat_ids:
+            text += "\n\nRelated chats:"
+            for relatedchat_id in relatedchat_ids:
+                group = DB().get_group(relatedchat_id)
+                relatedchat = bot.get_chat(group.group_id)
+                try:
+                    description = Helpers.get_description(bot, relatedchat, group)
+                except TelegramError:
+                    description = "No description"
+
+                try:
+                    invitelink = Helpers.get_invite_link(bot, relatedchat)
+                except TelegramError:
+                    invitelink = "No invite link available"
+
+                text += "\n{}\n\n{}\n\n{}".format(relatedchat.title, description, invitelink)
 
         bot.send_message(chat_id=update.message.from_user.id, text=text)
 
