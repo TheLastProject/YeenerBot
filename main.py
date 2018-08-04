@@ -456,7 +456,7 @@ class GroupInfoHandler():
                     except TelegramError:
                         invitelink = "No invite link available"
 
-                    message += "\n{}\n\n{}\n\n{}".format(relatedchat.title, description, invitelink)
+                    message += "\n{}\n\n{}\n\n{}\n\n----------\n\n".format(relatedchat.title, description, invitelink)
                 except TelegramError:
                     continue
 
@@ -754,7 +754,7 @@ class RuleHandler():
                 except TelegramError:
                     invitelink = "No invite link available"
 
-                text += "\n{}\n\n{}\n\n{}".format(relatedchat.title, description, invitelink)
+                text += "\n{}\n\n{}\n\n{}\n\n----------\n\n".format(relatedchat.title, description, invitelink)
 
         bot.send_message(chat_id=update.message.from_user.id, text=text)
 
