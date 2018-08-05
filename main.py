@@ -232,6 +232,23 @@ class Helpers():
 
         return chat.invite_link
 
+    @staticmethod
+    def get_related_chats(bot, group):
+        chats = []
+        relatedchat_ids = json.loads(group.relatedchat_ids)
+        for relatedchat_id in relatedchat_ids[:]:
+            try:
+                chats.append(bot.get_chat(relatedchat_id))
+            except TelegramError:
+                # Bugged chat? Remove right here
+                relatedchat_ids.remove(relatedchat_id)
+                group.relatedchat_ids = json.dumps(relatedchat_ids)
+                group.save()
+                continue
+
+        return chats
+
+
 class CallbackHandler():
     def __init__(self, dispatcher):
         callback_handler = CallbackQueryHandler(CallbackHandler.handle_callback, pass_update_queue=True)
@@ -439,13 +456,13 @@ class GroupInfoHandler():
         target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
 
         group = DB().get_group(update.message.chat.id)
-        relatedchat_ids = json.loads(group.relatedchat_ids)
-        if relatedchat_ids:
-            message = "{}\n\nRelated chats:".format(update.message.chat.title)
-            for relatedchat_id in relatedchat_ids:
+        relatedchats = Helpers.get_related_chats(bot, group)
+        if relatedchats:
+            message = "{}\n\nRelated chats:\n".format(update.message.chat.title)
+            related_chats_text = []
+            for relatedchat in relatedchats:
                 try:
-                    group = DB().get_group(relatedchat_id)
-                    relatedchat = bot.get_chat(group.group_id)
+                    group = DB().get_group(relatedchat.id)
                     try:
                         description = Helpers.get_description(bot, relatedchat, group)
                     except TelegramError:
@@ -456,10 +473,11 @@ class GroupInfoHandler():
                     except TelegramError:
                         invitelink = "No invite link available"
 
-                    message += "\n{}\n\n{}\n\n{}\n\n----------\n".format(relatedchat.title, description, invitelink)
+                    related_chats_text.append("{}\n\n{}\n\n{}".format(relatedchat.title, description, invitelink))
                 except TelegramError:
                     continue
 
+            message += "\n----\n".join(related_chats_text)
             bot.send_message(chat_id=target_chat, text=message)
         else:
             bot.send_message(chat_id=target_chat, text="There are no known related chats for {}".format(update.message.chat.title))
@@ -519,10 +537,7 @@ class GroupInfoHandler():
                     chat = bot.get_chat(chat_id)
                     chats.append(chat)
                 except TelegramError:
-                    # Bugged chat? Remove right here
-                    relatedchat_ids.remove(chat_id)
-                    group.relatedchat_ids = json.dumps(relatedchat_ids)
-                    group.save()
+                    continue
 
             if len(chats) > 0:
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/removerelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
@@ -738,13 +753,13 @@ class RuleHandler():
         text += "The group rules are:\n{}\n\n".format(group.rules)
         text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
 
-        relatedchat_ids = json.loads(group.relatedchat_ids)
-        if relatedchat_ids:
-            text += "\n\nRelated chats:"
-            for relatedchat_id in relatedchat_ids:
+        relatedchats = Helpers.get_related_chats(bot, group)
+        if relatedchats:
+            text += "\n\nRelated chats:\n"
+            related_chats_text = []
+            for relatedchat in relatedchats:
                 try:
-                    group = DB().get_group(relatedchat_id)
-                    relatedchat = bot.get_chat(group.group_id)
+                    group = DB().get_group(relatedchat.id)
                     try:
                         description = Helpers.get_description(bot, relatedchat, group)
                     except TelegramError:
@@ -755,9 +770,11 @@ class RuleHandler():
                     except TelegramError:
                         invitelink = "No invite link available"
 
-                    text += "\n{}\n\n{}\n\n{}\n\n----------\n".format(relatedchat.title, description, invitelink)
+                    related_chats_text.append("{}\n\n{}\n\n{}".format(relatedchat.title, description, invitelink))
                 except TelegramError:
                     continue
+
+            text += "\n----\n".join(related_chats_text)
 
         bot.send_message(chat_id=update.message.from_user.id, text=text)
 
