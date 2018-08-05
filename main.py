@@ -742,19 +742,22 @@ class RuleHandler():
         if relatedchat_ids:
             text += "\n\nRelated chats:"
             for relatedchat_id in relatedchat_ids:
-                group = DB().get_group(relatedchat_id)
-                relatedchat = bot.get_chat(group.group_id)
                 try:
-                    description = Helpers.get_description(bot, relatedchat, group)
-                except TelegramError:
-                    description = "No description"
+                    group = DB().get_group(relatedchat_id)
+                    relatedchat = bot.get_chat(group.group_id)
+                    try:
+                        description = Helpers.get_description(bot, relatedchat, group)
+                    except TelegramError:
+                        description = "No description"
 
-                try:
-                    invitelink = Helpers.get_invite_link(bot, relatedchat)
-                except TelegramError:
-                    invitelink = "No invite link available"
+                    try:
+                        invitelink = Helpers.get_invite_link(bot, relatedchat)
+                    except TelegramError:
+                        invitelink = "No invite link available"
 
-                text += "\n{}\n\n{}\n\n{}\n\n----------\n".format(relatedchat.title, description, invitelink)
+                    text += "\n{}\n\n{}\n\n{}\n\n----------\n".format(relatedchat.title, description, invitelink)
+                except TelegramError:
+                    continue
 
         bot.send_message(chat_id=update.message.from_user.id, text=text)
 
