@@ -593,7 +593,7 @@ class GroupInfoHandler():
 
     @staticmethod
     @resolve_chat
-    @ensure_creator
+    @ensure_admin
     def revokeinvitelink(bot, update):
         target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
 
