@@ -478,7 +478,7 @@ class GroupInfoHandler():
                     continue
 
             message += "\n----\n".join(related_chats_text)
-            bot.send_message(chat_id=target_chat, text=message)
+            bot.send_message(chat_id=update.message.from_user.id, text=message)
         else:
             bot.send_message(chat_id=target_chat, text="There are no known related chats for {}".format(update.message.chat.title))
 
