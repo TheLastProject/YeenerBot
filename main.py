@@ -169,7 +169,7 @@ class Group():
     def save(self):
         auditlog = json.loads(self.auditlog)
         while len(auditlog) > 25:
-            auditlog.pop()
+            auditlog.pop(0)
         self.auditlog = json.dumps(auditlog)
 
         DB.update_group(self)
