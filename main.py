@@ -147,10 +147,12 @@ class MessageCache():
     messages = {}
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
+        self.forceruleread_enabled = forceruleread_enabled
+        self.readrules = readrules if readrules is not None else json.dumps([])
         self.description = description
         self.rules = rules
         self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
@@ -161,7 +163,7 @@ class Group():
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'readrules', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -347,10 +349,12 @@ class GreetingHandler():
         welcome_handler = MessageHandler(Filters.status_update.new_chat_members, GreetingHandler.welcome)
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
         togglewelcome_handler = CommandHandler('togglewelcome', GreetingHandler.toggle_welcome)
+        toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
         dispatcher.add_handler(start_handler)
         dispatcher.add_handler(welcome_handler)
         dispatcher.add_handler(setwelcome_handler)
         dispatcher.add_handler(togglewelcome_handler)
+        dispatcher.add_handler(toggleforceruleread_handler)
 
     @staticmethod
     def start(bot, update):
@@ -404,13 +408,32 @@ class GreetingHandler():
         bot.send_message(chat_id=target_chat, text="Welcome: {}".format(str(enabled)))
 
     @staticmethod
+    @resolve_chat
+    @ensure_admin
+    def toggle_forceruleread(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
+        group = DB().get_group(update.message.chat.id)
+
+        try:
+            enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
+        except (IndexError, ValueError):
+            bot.send_message(chat_id=target_chat, text="Current status: {}. Please specify true or false to change.".format(group.forceruleread_enabled))
+            return
+
+        group.forceruleread_enabled = enabled
+        group.save()
+
+        bot.send_message(chat_id=target_chat, text="Force rule read: {} (dependency welcome: {})".format(str(enabled), group.welcome_enabled))
+
+    @staticmethod
     def welcome(bot, update):
         group = DB().get_group(update.message.chat.id)
         if not group.welcome_enabled:
             return
 
         # Don't welcome bots (or ourselves)
-        members = [member.name for member in update.message.new_chat_members if not member.is_bot]
+        members = [member for member in update.message.new_chat_members if not member.is_bot]
         if len(members) == 0:
             return
 
@@ -419,7 +442,7 @@ class GreetingHandler():
         except TelegramError:
             invite_link = None
 
-        data = dict_no_keyerror({'usernames': ", ".join(members),
+        data = dict_no_keyerror({'usernames': ", ".join(member.name for member in members),
                                  'title': update.message.chat.title,
                                  'invite_link': invite_link,
                                  'mods': ", ".join(Helpers.list_mods(update.message.chat)),
@@ -431,6 +454,14 @@ class GreetingHandler():
         bot.send_message(chat_id=update.message.chat_id,
                          text=text.format(**data),
                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]]))
+
+        # Restrict users until they accept the rules if forceruleread is enabled
+        if group.forceruleread_enabled:
+            readrules_ids = json.loads(group.readrules)
+            for member in members:
+                chat_member = update.message.chat.get_member(member.id)
+                if member.id not in readrules_ids and chat_member.status not in ['creator', 'administrator']:
+                    bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.id, can_send_messages=False)
 
 
 class GroupInfoHandler():
@@ -733,13 +764,23 @@ class RuleHandler():
     def send_rules(bot, update):
         target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
 
+        group = DB().get_group(update.message.chat.id)
+
+        readrules_ids = json.loads(group.readrules)
+        if update.message.from_user.id not in readrules_ids:
+            member = update.message.chat.get_member(update.message.from_user.id)
+            if member.status not in ['creator', 'administrator']:
+                bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
+
+            readrules_ids.append(update.message.from_user.id)
+            group.readrules = json.dumps(readrules_ids)
+            group.save()
+
         # Notify owner
         try:
             bot.send_message(chat_id=Helpers.get_creator(update.message.chat).id, text="{} just requested the rules for {}.".format(update.message.from_user.name, update.message.chat.title))
         except Unauthorized:
             pass
-
-        group = DB().get_group(update.message.chat.id)
 
         if not group.rules:
             bot.send_message(chat_id=target_chat, text="No rules set for this group yet. Just don't be a meanie, okay?")
