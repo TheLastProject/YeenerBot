@@ -460,7 +460,7 @@ class GreetingHandler():
             readrules_ids = json.loads(group.readrules)
             for member in members:
                 chat_member = update.message.chat.get_member(member.id)
-                if member.id not in readrules_ids and chat_member.status not in ['creator', 'administrator']:
+                if member.id not in readrules_ids and chat_member.status == 'member':
                     bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.id, can_send_messages=False)
 
 
@@ -769,7 +769,7 @@ class RuleHandler():
         readrules_ids = json.loads(group.readrules)
         if update.message.from_user.id not in readrules_ids:
             member = update.message.chat.get_member(update.message.from_user.id)
-            if member.status not in ['creator', 'administrator']:
+            if member.status == 'restricted':
                 bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
 
             readrules_ids.append(update.message.from_user.id)
