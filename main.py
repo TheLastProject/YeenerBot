@@ -931,7 +931,6 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat.id, text=warningtext)
 
     @staticmethod
-    @resolve_chat
     @ensure_admin
     def clearwarnings(bot, update):
         if not update.message.reply_to_message:
@@ -948,7 +947,6 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name))
 
     @staticmethod
-    @resolve_chat
     @ensure_admin
     def kick(bot, update):
         if not update.message.reply_to_message:
@@ -974,7 +972,6 @@ class ModerationHandler():
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
 
     @staticmethod
-    @resolve_chat
     @ensure_admin
     def ban(bot, update):
         if not update.message.reply_to_message:
