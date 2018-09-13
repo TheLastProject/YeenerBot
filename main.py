@@ -93,8 +93,8 @@ def resolve_chat(function):
 
         superadmin = False
         if user.id in superadmins:
-            user = DB().get_user(update.message.from_user.id)
-            if time.time() - user.sudo_time <= 30:
+            db_user = DB().get_user(update.message.from_user.id)
+            if time.time() - db_user.sudo_time <= 30:
                 superadmin = True
 
         for group in DB.get_all_groups():
