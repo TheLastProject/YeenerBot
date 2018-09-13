@@ -8,6 +8,7 @@
 #
 # See LICENSE for more information
 
+import configparser
 import datetime
 import io
 import json
@@ -1043,8 +1044,16 @@ class SauceNaoHandler():
 
 
 # Setup
-token = os.environ['TELEGRAM_BOT_TOKEN']
-saucenao_token = os.environ['SAUCENAO_TOKEN']
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+if not config.has_option('TOKENS', 'Telegram'):
+    print("No Telegram token set in config.ini. Cannot continue.")
+    exit(1)
+
+token = config['TOKENS']['Telegram']
+saucenao_token = config.get('TOKENS', 'SauceNao', fallback=None)
+
 updater = Updater(token=token)
 dispatcher = updater.dispatcher
 
@@ -1057,7 +1066,10 @@ GroupInfoHandler(dispatcher)
 RandomHandler(dispatcher)
 RuleHandler(dispatcher)
 ModerationHandler(dispatcher)
-SauceNaoHandler(dispatcher)
+if saucenao_token:
+    SauceNaoHandler(dispatcher)
+else:
+    print("No SauceNao token set in config.ini. SauceNaoHandler will be disabled.")
 
 # Start bot
 updater.start_polling(bootstrap_retries=-1)
