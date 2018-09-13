@@ -32,11 +32,17 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 def ensure_creator(function):
     def wrapper(bot, update, **optional_args):
-        if update.message.from_user.id not in superadmins:
-            member = update.message.chat.get_member(update.message.from_user.id)
-            if member.status != 'creator':
+        member = update.message.chat.get_member(update.message.from_user.id)
+        if member.status != 'creator':
+            if update.message.from_user.id not in superadmins:
                 target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
                 bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
+                return
+
+            user = DB().get_user(update.message.from_user.id)
+            if time.time() - user.sudo_time > 30:
+                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+                bot.send_message(chat_id=target_chat, text="Permission denied. Are you root? (try /sudo).")
                 return
 
         if update.message.text.split(' ', 1)[0] != '/auditlog':
@@ -53,11 +59,17 @@ def ensure_creator(function):
 
 def ensure_admin(function):
     def wrapper(bot, update, **optional_args):
-        if update.message.from_user.id not in superadmins:
-            member = update.message.chat.get_member(update.message.from_user.id)
-            if member.status not in ['creator', 'administrator']:
+        member = update.message.chat.get_member(update.message.from_user.id)
+        if member.status not in ['creator', 'administrator']:
+            if update.message.from_user.id not in superadmins:
                 target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
                 bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
+                return
+
+            user = DB().get_user(update.message.from_user.id)
+            if time.time() - user.sudo_time > 30:
+                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+                bot.send_message(chat_id=target_chat, text="Permission denied. Are you root? (try /sudo).")
                 return
 
         if update.message.text.split(' ', 1)[0] != '/auditlog':
@@ -78,13 +90,20 @@ def resolve_chat(function):
 
         user = update.message.from_user
         chats = []
+
+        superadmin = False
+        if user.id in superadmins:
+            user = DB().get_user(update.message.from_user.id)
+            if time.time() - user.sudo_time <= 30:
+                superadmin = True
+
         for group in DB.get_all_groups():
             try:
                 chat = bot.get_chat(group.group_id)
                 if chat.type == 'private':
                     continue
 
-                if user.id not in superadmins and not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
+                if superadmin and not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
                     continue
 
                 chats.append(chat)
@@ -123,6 +142,7 @@ class SupportsFilter():
 class DB():
     __db = dataset.connect('sqlite:///data.db')
     __group_table = __db['group']
+    __user_table = __db['user']
 
     @staticmethod
     def get_group(group_id):
@@ -146,8 +166,39 @@ class DB():
     def update_group(group):
         DB().__group_table.upsert(group.serialize(), ['group_id'])
 
+    @staticmethod
+    def get_user(user_id):
+        user_data = DB().__user_table.find_one(user_id=user_id)
+        if not user_data:
+            return User(user_id)
+
+        filtered_user_data = {_key: user_data[_key] for _key in User.get_keys() if _key in user_data}
+        return User(**filtered_user_data)
+
+    @staticmethod
+    def update_user(user):
+        DB().__user_table.upsert(user.serialize(), ['user_id'])
+
+
 class MessageCache():
     messages = {}
+
+
+class User():
+    def __init__(self, user_id, sudo_time=0):
+        self.user_id = user_id
+        self.sudo_time = sudo_time
+
+    @staticmethod
+    def get_keys():
+        return ['user_id', 'sudo_time']
+
+    def serialize(self):
+        return {_key: getattr(self, _key) for _key in User.get_keys()}
+
+    def save(self):
+        DB.update_user(self)
+
 
 class Group():
     def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None):
@@ -344,6 +395,25 @@ class DebugHandler():
             "Ha! I win.",
             "Damn, I missed!"
         ], weights=[90,5,5])[0]))
+
+
+class SudoHandler():
+    def __init__(self, dispatcher):
+        sudo_handler = CommandHandler('sudo', SudoHandler.sudo)
+        dispatcher.add_handler(sudo_handler)
+
+    @staticmethod
+    def sudo(bot, update):
+        if update.message.from_user.id not in superadmins:
+            bot.send_message(chat_id=update.message.chat_id, text="{} is not a superadmin. This incident will be reported.".format(update.message.from_user.name))
+            print("{} ({}) tried to use sudo but was denied".format(update.message.from_user.name, update.message.from_user.id))
+            return
+
+        user = DB().get_user(update.message.from_user.id)
+        user.sudo_time = time.time()
+        user.save()
+
+        bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 30 seconds).")
 
 
 class GreetingHandler():
@@ -1069,6 +1139,7 @@ dispatcher = updater.dispatcher
 ErrorHandler(dispatcher)
 CallbackHandler(dispatcher)
 DebugHandler(dispatcher)
+SudoHandler(dispatcher)
 GreetingHandler(dispatcher)
 GroupInfoHandler(dispatcher)
 RandomHandler(dispatcher)
