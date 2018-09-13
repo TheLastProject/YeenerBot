@@ -103,7 +103,7 @@ def resolve_chat(function):
                 if chat.type == 'private':
                     continue
 
-                if not superadmin and not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
+                if not superadmin or not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
                     continue
 
                 chats.append(chat)
