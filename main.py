@@ -32,11 +32,12 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 def ensure_creator(function):
     def wrapper(bot, update, **optional_args):
-        member = update.message.chat.get_member(update.message.from_user.id)
-        if member.status != 'creator':
-            target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-            bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
-            return
+        if update.message.from_user.id not in superadmins:
+            member = update.message.chat.get_member(update.message.from_user.id)
+            if member.status != 'creator':
+                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+                bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
+                return
 
         if update.message.text.split(' ', 1)[0] != '/auditlog':
             group = DB().get_group(update.message.chat.id)
@@ -52,11 +53,12 @@ def ensure_creator(function):
 
 def ensure_admin(function):
     def wrapper(bot, update, **optional_args):
-        member = update.message.chat.get_member(update.message.from_user.id)
-        if member.status not in ['creator', 'administrator']:
-            target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-            bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
-            return
+        if update.message.from_user.id not in superadmins:
+            member = update.message.chat.get_member(update.message.from_user.id)
+            if member.status not in ['creator', 'administrator']:
+                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+                bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
+                return
 
         if update.message.text.split(' ', 1)[0] != '/auditlog':
             group = DB().get_group(update.message.chat.id)
@@ -82,7 +84,7 @@ def resolve_chat(function):
                 if chat.type == 'private':
                     continue
 
-                if not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
+                if user.id not in superadmins and not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
                     continue
 
                 chats.append(chat)
@@ -1046,6 +1048,12 @@ class SauceNaoHandler():
 # Setup
 config = configparser.ConfigParser()
 config.read('config.ini')
+
+try:
+    superadmins = [int(superadmin) for superadmin in config.get('GENERAL', 'Superadmins', fallback="").split(" ")]
+except Exception:
+    print("No superadmins found or failed to parse the list. Continuing as normal.")
+    superadmins = []
 
 if not config.has_option('TOKENS', 'Telegram'):
     print("No Telegram token set in config.ini. Cannot continue.")

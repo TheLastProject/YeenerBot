@@ -1,3 +1,11 @@
 [TOKENS]
+# Telegram token, necessary for obvious reasons. See https://core.telegram.org/bots#6-botfather
 Telegram = XXXXXX
+# Optional, used for /source function. Create an account on https://saucenao.com/ for a key.
 #SauceNao = XXXXXX
+
+[GENERAL]
+# Optional, space-separated list of Telegram user IDs that are seen as "admins" in every chat the bot is in.
+# Get them from @userinfobot for example.
+# ADVANCED FEATURE! USE WITH CARE! Probably just want to leave it empty!
+#Superadmins =
