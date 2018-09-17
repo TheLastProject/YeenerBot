@@ -799,8 +799,12 @@ class RandomHandler():
                 if admin.user.id == update.message.from_user.id:
                     return
             
-            bot.send_message(chat_id=update.message.from_user.id, text = Helpers.get_invite_link(bot, update.message.chat))
-            bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+            try:
+                bot.send_message(chat_id=update.message.from_user.id, text=Helpers.get_invite_link(bot, update.message.chat))
+                bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+            except TelegramError:
+                return
+
             bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
         else:
             chambersremaining = 5 - group.chamber
