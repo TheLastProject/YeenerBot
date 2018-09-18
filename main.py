@@ -31,33 +31,6 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageH
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-def ensure_creator(function):
-    def wrapper(bot, update, **optional_args):
-        member = update.message.chat.get_member(update.message.from_user.id)
-        if member.status != 'creator':
-            if update.message.from_user.id not in superadmins:
-                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-                bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
-                return
-
-            user = DB().get_user(update.message.from_user.id)
-            if time.time() - user.sudo_time > 30:
-                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-                bot.send_message(chat_id=target_chat, text="Permission denied. Are you root? (try /sudo).")
-                return
-
-        if update.message.text.split(' ', 1)[0] != '/auditlog':
-            group = DB().get_group(update.message.chat.id)
-            auditlog = json.loads(group.auditlog)
-            auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text})
-            group.auditlog = json.dumps(auditlog)
-            group.save()
-
-        return function(bot=bot, update=update, **optional_args)
-
-    return wrapper
-
-
 def ensure_admin(function):
     def wrapper(bot, update, **optional_args):
         member = update.message.chat.get_member(update.message.from_user.id)
@@ -675,7 +648,7 @@ class GroupInfoHandler():
 
     @staticmethod
     @resolve_chat
-    @ensure_creator
+    @ensure_admin
     def set_description(bot, update):
         target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
 
