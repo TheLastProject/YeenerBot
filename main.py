@@ -62,7 +62,13 @@ def ensure_admin(function):
 
 def resolve_chat(function):
     def wrapper(bot, update, **optional_args):
-        if update.message.chat.type != 'private':
+        is_control_channel = False
+        for group in DB.get_all_groups():
+            if group.controlchannel_id == str(update.message.chat.id):
+                is_control_channel = True
+                break
+
+        if not is_control_channel and update.message.chat.type != 'private':
             return function(bot=bot, update=update, **optional_args)
 
         user = update.message.from_user
@@ -80,6 +86,9 @@ def resolve_chat(function):
                 if chat.type == 'private':
                     continue
 
+                if chat.id == update.message.chat_id:
+                    continue
+
                 if not superadmin and not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
                     continue
 
@@ -91,7 +100,7 @@ def resolve_chat(function):
             bot.send_message(chat_id=update.message.chat_id, text="You are not in any chats known to me.")
             return
 
-        MessageCache.messages[update.message.chat_id] = update.message
+        MessageCache.messages[update.message.chat.id] = update.message
         keyboard_buttons = [InlineKeyboardButton("[ALL CHATS]", callback_data=-1)]
         for chat in chats:
             keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
@@ -301,21 +310,22 @@ class CallbackHandler():
     def handle_callback(bot, update, update_queue):
         reply_to_message = None
 
-        update.callback_query.message.delete()
         if '_' in update.callback_query.data:
             chat_id, command = update.callback_query.data.split('_', 1)
             try:
-                reply_to_message = MessageCache.messages.pop(update.callback_query.from_user.id)
+                reply_to_message = MessageCache.messages.pop(update.callback_query.message.chat.id)
             except KeyError:
                 pass
         else:
             chat_id = update.callback_query.data
             try:
-                command = MessageCache.messages.pop(update.callback_query.from_user.id).text
+                command = MessageCache.messages.pop(update.callback_query.message.chat.id).text
             except KeyError:
                 update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the command and choosing the chat to send it to.")
+                update.callback_query.message.delete()
                 return
 
+        update.callback_query.message.delete()
         # We use -1 for "all chats"
         chats = []
         if chat_id == str(-1):
@@ -590,6 +600,9 @@ class GroupInfoHandler():
                     if chat.type == 'private':
                         continue
 
+                    if chat.id == update.message.chat_id:
+                        continue
+
                     if not chat.get_member(update.message.from_user.id).status in ['creator', 'administrator', 'member']:
                         continue
 
@@ -675,6 +688,9 @@ class GroupInfoHandler():
                 try:
                     chat = bot.get_chat(group.group_id)
                     if chat.type == 'private':
+                        continue
+
+                    if chat.id == update.message.chat_id:
                         continue
 
                     if not chat.get_member(update.message.from_user.id).status in ['creator', 'administrator', 'member']:
