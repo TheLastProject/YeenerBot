@@ -346,10 +346,13 @@ class CallbackHandler():
             for group in DB.get_all_groups():
                 try:
                     chat = bot.get_chat(group.group_id)
-                    if is_control_channel and group.controlchannel_id != str(update.message.chat.id):
+                    if is_control_channel and group.controlchannel_id != str(update.callback_query.message.chat.id):
                         continue
 
                     if chat.type == 'private':
+                        continue
+
+                    if chat.id == update.callback_query.message.chat_id:
                         continue
 
                     if not chat.get_member(update.callback_query.from_user.id).status in ['creator', 'administrator', 'member']:
