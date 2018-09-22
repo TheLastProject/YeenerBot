@@ -84,7 +84,7 @@ def resolve_chat(function):
             try:
                 chat = bot.get_chat(group.group_id)
 
-                if is_control_channel and group.controlchannel_id != chat.id:
+                if is_control_channel and group.controlchannel_id != update.message.chat.id:
                     continue
 
                 if chat.type == 'private':
