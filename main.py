@@ -316,7 +316,7 @@ class CallbackHandler():
 
     @staticmethod
     def handle_callback(bot, update, update_queue):
-        reply_to_message = update.message.reply_to_message
+        reply_to_message = update.callback_query.message.reply_to_message
 
         if '_' in update.callback_query.data:
             chat_id, command = update.callback_query.data.split('_', 1)
