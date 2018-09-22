@@ -83,6 +83,10 @@ def resolve_chat(function):
         for group in DB.get_all_groups():
             try:
                 chat = bot.get_chat(group.group_id)
+
+                if is_control_channel and group.controlchannel_id != chat.id:
+                    continue
+
                 if chat.type == 'private':
                     continue
 
