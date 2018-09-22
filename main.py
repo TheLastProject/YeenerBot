@@ -36,14 +36,12 @@ def ensure_admin(function):
         member = update.message.chat.get_member(update.message.from_user.id)
         if member.status not in ['creator', 'administrator']:
             if update.message.from_user.id not in superadmins:
-                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-                bot.send_message(chat_id=target_chat, text="You do not have the required permission to do this.")
+                bot.send_message(chat_id=update.effective_chat.id, text="You do not have the required permission to do this.")
                 return
 
             user = DB().get_user(update.message.from_user.id)
             if time.time() - user.sudo_time > 30:
-                target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-                bot.send_message(chat_id=target_chat, text="Permission denied. Are you root? (try /sudo).")
+                bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).")
                 return
 
         if update.message.text.split(' ', 1)[0] != '/auditlog':
@@ -241,14 +239,12 @@ class ErrorHandler():
         if not update:
             return
 
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         if type(error) == Unauthorized:
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
-            bot.send_message(chat_id=target_chat, text=text)
+            bot.send_message(chat_id=update.effective_chat.id, text=text)
         else:
             text = "An error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
-            bot.send_message(chat_id=target_chat, text=text)
+            bot.send_message(chat_id=update.effective_chat.id, text=text)
 
 
 class Helpers():
@@ -366,7 +362,9 @@ class CallbackHandler():
 
         for chat in chats:
             message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=bot, reply_to_message=reply_to_message)
-            update_queue.put(Update(update_id=-1, message=message))
+            new_update = Update(update_id=-1, message=message)
+            new_update._effective_chat = update.callback_query.message.chat  # I sure hope this won't break in a future version: https://github.com/python-telegram-bot/python-telegram-bot/blob/d4b5bd40a5545a238ebd63f7ffcc1811691526b0/telegram/update.py#L96<Paste>
+            update_queue.put(new_update)
 
         if reply_to_message:
             update.callback_query.answer(text='Executing {} on message'.format(command))
@@ -462,8 +460,6 @@ class GreetingHandler():
     @resolve_chat
     @ensure_admin
     def set_welcome(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
         text = "Welcome message set."
         try:
@@ -474,45 +470,41 @@ class GreetingHandler():
 
         group.save()
 
-        bot.send_message(chat_id=target_chat, text=text)
+        bot.send_message(chat_id=update.effective_chat.id, text=text)
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def toggle_welcome(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=target_chat, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled))
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled))
             return
 
         group.welcome_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=target_chat, text="Welcome: {}".format(str(enabled)))
+        bot.send_message(chat_id=update.effective_chat.id, text="Welcome: {}".format(str(enabled)))
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def toggle_forceruleread(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=target_chat, text="Current status: {}. Please specify true or false to change.".format(group.forceruleread_enabled))
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.forceruleread_enabled))
             return
 
         group.forceruleread_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=target_chat, text="Force rule read: {} (dependency welcome: {})".format(str(enabled), group.welcome_enabled))
+        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {})".format(str(enabled), group.welcome_enabled))
 
     @staticmethod
     def welcome(bot, update):
@@ -576,8 +568,6 @@ class GroupInfoHandler():
     @staticmethod
     @resolve_chat
     def relatedchats(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
         relatedchats = Helpers.get_related_chats(bot, group)
         if relatedchats:
@@ -603,14 +593,12 @@ class GroupInfoHandler():
             message += "\n----\n".join(related_chats_text)
             bot.send_message(chat_id=update.message.from_user.id, text=message)
         else:
-            bot.send_message(chat_id=target_chat, text="There are no known related chats for {}".format(update.message.chat.title))
+            bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title))
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def add_relatedchat(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         chat_ids = update.message.text.split(' ')[1:]
         if len(chat_ids) == 0:
             chats = []
@@ -631,11 +619,11 @@ class GroupInfoHandler():
                     continue
 
             if len(chats) == 0:
-                bot.send_message(chat_id=target_chat, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
+                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
                 return
 
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/addrelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
-            bot.send_message(chat_id=target_chat, text="Add which chat as a related chat?", reply_markup=keyboard)
+            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a related chat?", reply_markup=keyboard)
             return
 
         group = DB().get_group(update.message.chat.id)
@@ -651,8 +639,6 @@ class GroupInfoHandler():
     @resolve_chat
     @ensure_admin
     def remove_relatedchat(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
         relatedchat_ids = json.loads(group.relatedchat_ids)
         chat_ids = update.message.text.split(' ', 1)[1:]
@@ -667,9 +653,9 @@ class GroupInfoHandler():
 
             if len(chats) > 0:
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/removerelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
-                bot.send_message(chat_id=target_chat, text="Remove which chat from related chats?", reply_markup=keyboard)
+                bot.send_message(chat_id=update.effective_chat.id, text="Remove which chat from related chats?", reply_markup=keyboard)
             else:
-                bot.send_message(chat_id=target_chat, text="There are no known related chats for {}".format(update.message.chat.title))
+                bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title))
             return
 
         for chat_id in chat_ids:
@@ -685,22 +671,18 @@ class GroupInfoHandler():
     @resolve_chat
     @ensure_admin
     def controlchannel(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
         if group.controlchannel_id:
             message = "{}\n\nControl channel:\n{}".format(update.message.chat.title, bot.get_chat(group.controlchannel_id).title)
         else:
             message = "{}\n\nNo known control channel".format(update.message.chat.title)
 
-        bot.send_message(chat_id=target_chat, text=message)
+        bot.send_message(chat_id=update.effective_chat.id, text=message)
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def set_controlchannel(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         chat_id = update.message.text.split(' ')[1:]
         if len(chat_id) == 0:
             chats = []
@@ -721,14 +703,14 @@ class GroupInfoHandler():
                     continue
 
             if len(chats) == 0:
-                bot.send_message(chat_id=target_chat, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
+                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
                 return
 
             keyboard_buttons = [InlineKeyboardButton("[REMOVE CONTROL CHANNEL]", callback_data='{}_/setcontrolchannel -1'.format(update.message.chat.id))]
             for chat in chats:
                 keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchannel {}'.format(update.message.chat.id, chat.id)))
             keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-            bot.send_message(chat_id=target_chat, text="Add which chat as a control channel?", reply_markup=keyboard)
+            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a control channel?", reply_markup=keyboard)
             return
 
         group = DB().get_group(update.message.chat.id)
@@ -748,8 +730,6 @@ class GroupInfoHandler():
     @resolve_chat
     @ensure_admin
     def set_description(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
         text = "Description set."
         try:
@@ -760,28 +740,24 @@ class GroupInfoHandler():
 
         group.save()
 
-        bot.send_message(chat_id=target_chat, text=text)
+        bot.send_message(chat_id=update.effective_chat.id, text=text)
 
     @staticmethod
     @resolve_chat
     def invitelink(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
-            bot.send_message(chat_id=target_chat, text="{} does not have an invite link".format(update.message.chat.title))
+            bot.send_message(chat_id=update.effective_chat.id, text="{} does not have an invite link".format(update.message.chat.title))
             return
 
-        bot.send_message(chat_id=target_chat, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
+        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
 
     @staticmethod
     @resolve_chat
     @ensure_admin
     def revokeinvitelink(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         bot.export_chat_invite_link(update.message.chat.id)
-        bot.send_message(chat_id=target_chat, text="Invite link for {} revoked".format(update.message.chat.title))
+        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title))
 
 
 class RandomHandler():
@@ -901,8 +877,6 @@ class RuleHandler():
     @resolve_chat
     @ensure_admin
     def set_rules(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
         text = "Rules set."
         try:
@@ -913,13 +887,11 @@ class RuleHandler():
 
         group.save()
 
-        bot.send_message(chat_id=target_chat, text=text)
+        bot.send_message(chat_id=update.effective_chat.id, text=text)
 
     @staticmethod
     @resolve_chat
     def send_rules(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         group = DB().get_group(update.message.chat.id)
 
         readrules_ids = json.loads(group.readrules)
@@ -940,7 +912,7 @@ class RuleHandler():
                 pass
 
         if not group.rules:
-            bot.send_message(chat_id=target_chat, text="No rules set for this group yet. Just don't be a meanie, okay?")
+            bot.send_message(chat_id=update.effective_chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
 
         text = "{}\n\n".format(update.message.chat.title)
@@ -1028,8 +1000,6 @@ class ModerationHandler():
     @staticmethod
     @resolve_chat
     def warnings(bot, update):
-        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
-
         if update.message.reply_to_message:
             message = update.message.reply_to_message
         else:
@@ -1038,7 +1008,7 @@ class ModerationHandler():
         group = DB().get_group(update.message.chat.id)
         warnings = json.loads(group.warned)
         if str(message.from_user.id) not in warnings:
-            bot.send_message(chat_id=target_chat, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
+            bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
@@ -1051,7 +1021,7 @@ class ModerationHandler():
 
             warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
-        bot.send_message(chat_id=target_chat, text=warningtext)
+        bot.send_message(chat_id=update.effective_chat.id, text=warningtext)
 
     @staticmethod
     @ensure_admin
