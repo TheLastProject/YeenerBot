@@ -109,7 +109,7 @@ def resolve_chat(function):
             return
 
         MessageCache.messages[update.message.chat.id] = update.message
-        keyboard_buttons = [InlineKeyboardButton("[ALL CHATS]", callback_data=-1)]
+        keyboard_buttons = [InlineKeyboardButton("[ALL CHATS]" if not is_control_channel else "[ALL RELATED CHATS]", callback_data=-1)]
         for chat in chats:
             keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
         keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
@@ -334,12 +334,21 @@ class CallbackHandler():
                 return
 
         update.callback_query.message.delete()
-        # We use -1 for "all chats"
+        # We use -1 for "all chats", except in control channels, then it's only "all related control channels"
+        is_control_channel = False
+        for group in DB.get_all_groups():
+            if group.controlchannel_id == str(update.callback_query.message.chat.id):
+                is_control_channel = True
+                break
+
         chats = []
         if chat_id == str(-1):
             for group in DB.get_all_groups():
                 try:
                     chat = bot.get_chat(group.group_id)
+                    if is_control_channel and group.controlchannel_id != str(update.message.chat.id):
+                        continue
+
                     if chat.type == 'private':
                         continue
 
