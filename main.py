@@ -52,6 +52,9 @@ def ensure_admin(function):
             auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text})
             group.auditlog = json.dumps(auditlog)
             group.save()
+            if group.controlchannel_id:
+                audittext = "[{}] {}: {}".format(str(datetime.datetime.fromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], update.message.from_user.name, auditlog[-1]['command'])
+                bot.send_message(chat_id=group.controlchannel_id, text="{}\n\n{}".format(update.message.chat.title, audittext))
 
         return function(bot=bot, update=update, **optional_args)
 
@@ -175,7 +178,7 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None, controlchannel_id=None):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
@@ -188,10 +191,11 @@ class Group():
         self.chamber = chamber if chamber is not None else 5
         self.warned = warned if warned is not None else json.dumps({})
         self.auditlog = auditlog if auditlog is not None else json.dumps([])
+        self.controlchannel_id = controlchannel_id
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'readrules', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'readrules', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog', 'controlchannel_id']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -527,6 +531,8 @@ class GroupInfoHandler():
         removerelatedchat_handler = CommandHandler('removerelatedchat', GroupInfoHandler.remove_relatedchat)
         invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
         revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupInfoHandler.revokeinvitelink)
+        controlchannel_handler = CommandHandler('controlchannel', GroupInfoHandler.controlchannel)
+        setcontrolchannel_handler = CommandHandler('setcontrolchannel', GroupInfoHandler.set_controlchannel)
         dispatcher.add_handler(description_handler)
         dispatcher.add_handler(setdescription_handler)
         dispatcher.add_handler(relatedchats_handler)
@@ -534,6 +540,8 @@ class GroupInfoHandler():
         dispatcher.add_handler(removerelatedchat_handler)
         dispatcher.add_handler(invitelink_handler)
         dispatcher.add_handler(revokeinvitelink_handler)
+        dispatcher.add_handler(controlchannel_handler)
+        dispatcher.add_handler(setcontrolchannel_handler)
 
     @staticmethod
     @resolve_chat
@@ -638,6 +646,60 @@ class GroupInfoHandler():
                 pass
 
         group.relatedchat_ids = json.dumps(relatedchat_ids)
+        group.save()
+
+    @staticmethod
+    @resolve_chat
+    @ensure_admin
+    def controlchannel(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
+        group = DB().get_group(update.message.chat.id)
+        if group.controlchannel_id:
+            message = "{}\n\nControl channel:\n{}".format(update.message.chat.title, bot.get_chat(group.controlchannel_id).title)
+        else:
+            message = "{}\n\nNo known control channel".format(update.message.chat.title)
+
+        bot.send_message(chat_id=target_chat, text=message)
+
+    @staticmethod
+    @resolve_chat
+    @ensure_admin
+    def set_controlchannel(bot, update):
+        target_chat = update.message.from_user.id if update.update_id == -1 else update.message.chat_id
+
+        chat_id = update.message.text.split(' ')[1:]
+        if len(chat_id) == 0:
+            chats = []
+            for group in DB.get_all_groups():
+                try:
+                    chat = bot.get_chat(group.group_id)
+                    if chat.type == 'private':
+                        continue
+
+                    if not chat.get_member(update.message.from_user.id).status in ['creator', 'administrator', 'member']:
+                        continue
+
+                    chats.append(chat)
+                except TelegramError:
+                    continue
+
+            if len(chats) == 0:
+                bot.send_message(chat_id=target_chat, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
+                return
+
+            keyboard_buttons = [InlineKeyboardButton("[REMOVE CONTROL CHANNEL]", callback_data='{}_/setcontrolchannel -1'.format(update.message.chat.id))]
+            for chat in chats:
+                keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchannel {}'.format(update.message.chat.id, chat.id)))
+            keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
+            bot.send_message(chat_id=target_chat, text="Add which chat as a control channel?", reply_markup=keyboard)
+            return
+
+        group = DB().get_group(update.message.chat.id)
+        if chat_id[0] == str(-1):
+            group.controlchannel_id = None
+        else:
+            group.controlchannel_id = chat_id[0]
         group.save()
 
     @staticmethod
@@ -834,11 +896,12 @@ class RuleHandler():
             group.readrules = json.dumps(readrules_ids)
             group.save()
 
-        # Notify owner
-        try:
-            bot.send_message(chat_id=Helpers.get_creator(update.message.chat).id, text="{} just requested the rules for {}.".format(update.message.from_user.name, update.message.chat.title))
-        except Unauthorized:
-            pass
+        # Notify control channel
+        if group.controlchannel_id:
+            try:
+                bot.send_message(chat_id=group.controlchannel_id, text="{} just requested the rules for {}".format(update.message.from_user.name, update.message.chat.title))
+            except Unauthorized:
+                pass
 
         if not group.rules:
             bot.send_message(chat_id=target_chat, text="No rules set for this group yet. Just don't be a meanie, okay?")
