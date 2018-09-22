@@ -84,7 +84,7 @@ def resolve_chat(function):
             try:
                 chat = bot.get_chat(group.group_id)
 
-                if is_control_channel and group.controlchannel_id != update.message.chat.id:
+                if is_control_channel and group.controlchannel_id != str(update.message.chat.id):
                     continue
 
                 if chat.type == 'private':
@@ -101,7 +101,11 @@ def resolve_chat(function):
                 continue
 
         if len(chats) == 0:
-            bot.send_message(chat_id=update.message.chat_id, text="You are not in any chats known to me.")
+            if is_control_channel:
+                message = "You are not in any chats relevant to this control channel."
+            else:
+                message = "You are not in any chats known to me."
+            bot.send_message(chat_id=update.message.chat_id, text=message)
             return
 
         MessageCache.messages[update.message.chat.id] = update.message
