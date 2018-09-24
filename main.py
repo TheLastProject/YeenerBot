@@ -80,10 +80,10 @@ def resolve_chat(function):
 
         for group in DB.get_all_groups():
             try:
-                chat = bot.get_chat(group.group_id)
-
                 if is_control_channel and group.controlchannel_id != str(update.message.chat.id):
                     continue
+
+                chat = bot.get_chat(group.group_id)
 
                 if chat.type == 'private':
                     continue
@@ -343,9 +343,10 @@ class CallbackHandler():
         if chat_id == str(-1):
             for group in DB.get_all_groups():
                 try:
-                    chat = bot.get_chat(group.group_id)
                     if is_control_channel and group.controlchannel_id != str(update.callback_query.message.chat.id):
                         continue
+
+                    chat = bot.get_chat(group.group_id)
 
                     if chat.type == 'private':
                         continue
