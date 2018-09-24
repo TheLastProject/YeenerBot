@@ -331,11 +331,13 @@ class CallbackHandler():
 
         update.callback_query.message.delete()
         # We use -1 for "all chats", except in control channels, then it's only "all related control channels"
+        control_channels = []
         is_control_channel = False
         for group in DB.get_all_groups():
-            if group.controlchannel_id == str(update.callback_query.message.chat.id):
-                is_control_channel = True
-                break
+            if group.controlchannel_id:
+                control_channels.append(group.controlchannel_id)
+                if group.controlchannel_id == str(update.callback_query.message.chat.id):
+                    is_control_channel = True
 
         chats = []
         if chat_id == str(-1):
@@ -346,6 +348,9 @@ class CallbackHandler():
                         continue
 
                     if chat.type == 'private':
+                        continue
+
+                    if str(chat.id) in control_channels:
                         continue
 
                     if chat.id == update.callback_query.message.chat_id:
