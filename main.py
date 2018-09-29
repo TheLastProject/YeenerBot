@@ -19,6 +19,7 @@ import random
 import re
 
 from collections import OrderedDict
+from copy import deepcopy
 from distutils.util import strtobool
 
 import dataset
@@ -114,6 +115,25 @@ def resolve_chat(function):
         bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard)
 
     return wrapper
+
+def requires_confirmation(function):
+    def wrapper(bot, update, **optional_args):
+        if update.message.text.split(' ')[-1] != '--yes-i-really-am-sure':
+            cloned_message = deepcopy(update.message)
+            cloned_message.text += " --yes-i-really-am-sure"
+            MessageCache.messages[update.message.chat.id] = cloned_message
+            yes_button = InlineKeyboardButton("Yes, I am sure", callback_data=update.message.chat.id)
+            keyboard = InlineKeyboardMarkup([[yes_button]])
+            bot.send_message(chat_id=update.message.chat_id, text="Are you really sure you want to run '{}'?".format(update.message.text), reply_markup=keyboard)
+            return
+
+        # Remove really sure parameter
+        update.message.text = ' '.join(update.message.text.split(' ')[:-1])
+
+        return function(bot=bot, update=update, **optional_args)
+
+    return wrapper
+
 
 class dict_no_keyerror(dict):
     def __missing__(self, key):
@@ -1135,6 +1155,7 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat_id, text=" ".join(update.message.text.split(' ')[1:]))
 
     @staticmethod
+    @requires_confirmation
     def call_mods(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name))
 
