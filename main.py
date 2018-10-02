@@ -45,7 +45,8 @@ def ensure_admin(function):
                 bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).")
                 return
 
-        if update.message.text.split(' ', 1)[0] != '/auditlog':
+        command = update.message.text.split(' ', 1)[0]
+        if not (command == '/auditlog' or command.startswith('/auditlog@')):
             group = DB().get_group(update.message.chat.id)
             auditlog = json.loads(group.auditlog)
             auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text})
