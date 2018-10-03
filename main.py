@@ -554,9 +554,10 @@ class GreetingHandler():
                                  'invite_link': invite_link,
                                  'mods': ", ".join(Helpers.list_mods(update.message.chat)),
                                  'description': Helpers.get_description(bot, update.message.chat, group),
+                                 'forceruleread_text': 'This group requires new members to read the rules before they can send messages. ' if group.forceruleread_enabled else '',
                                  'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)})
 
-        text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! Please make sure to read the /rules by pressing the button below."
+        text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! {forceruleread_text}Please make sure to read the /rules by pressing the button below."
 
         bot.send_message(chat_id=update.message.chat_id,
                          text=text.format(**data),
