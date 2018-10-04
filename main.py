@@ -298,7 +298,7 @@ class Helpers():
 
     @staticmethod
     def get_description(bot, chat, group):
-        return group.description if group.description is not None else bot.get_chat(chat.id).description
+        return group.description if group.description else bot.get_chat(chat.id).description
 
     @staticmethod
     def get_invite_link(bot, chat):
@@ -549,11 +549,15 @@ class GreetingHandler():
         except TelegramError:
             invite_link = None
 
+        description = Helpers.get_description(bot, update.message.chat, group)
+        if not description:
+            description = "No description"
+
         data = dict_no_keyerror({'usernames': ", ".join(member.name for member in members),
                                  'title': update.message.chat.title,
                                  'invite_link': invite_link,
                                  'mods': ", ".join(Helpers.list_mods(update.message.chat)),
-                                 'description': Helpers.get_description(bot, update.message.chat, group),
+                                 'description': description,
                                  'forceruleread_text': 'This group requires new members to read the rules before they can send messages. ' if group.forceruleread_enabled else '',
                                  'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)})
 
@@ -607,6 +611,9 @@ class GroupInfoHandler():
                     try:
                         description = Helpers.get_description(bot, relatedchat, group)
                     except TelegramError:
+                        pass
+
+                    if not description:
                         description = "No description"
 
                     try:
@@ -752,7 +759,11 @@ class GroupInfoHandler():
     @resolve_chat
     def description(bot, update):
         group = DB().get_group(update.message.chat.id)
-        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, Helpers.get_description(bot, update.message.chat, group)))
+        description = Helpers.get_description(bot, update.message.chat, group)
+        if not description:
+            description = "No description"
+
+        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
 
     @staticmethod
     @resolve_chat
@@ -958,9 +969,13 @@ class RuleHandler():
             for relatedchat in relatedchats:
                 try:
                     group = DB().get_group(relatedchat.id)
+
                     try:
                         description = Helpers.get_description(bot, relatedchat, group)
                     except TelegramError:
+                        pass
+
+                    if not description:
                         description = "No description"
 
                     try:
