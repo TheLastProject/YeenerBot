@@ -298,7 +298,7 @@ class Helpers():
 
     @staticmethod
     def get_description(bot, chat, group):
-        return group.description if group.description else bot.get_chat(chat.id).description
+        return group.description if group.description is not None else bot.get_chat(chat.id).description
 
     @staticmethod
     def get_invite_link(bot, chat):
