@@ -161,7 +161,9 @@ class DB():
     def get_group(group_id):
         group_data = DB().__group_table.find_one(group_id=group_id)
         if not group_data:
-            return Group(group_id)
+            group = Group(group_id)
+            group.save()
+            return group
 
         filtered_group_data = {_key: group_data[_key] for _key in Group.get_keys() if _key in group_data}
         return Group(**filtered_group_data)
@@ -180,10 +182,24 @@ class DB():
         DB().__group_table.upsert(group.serialize(), ['group_id'])
 
     @staticmethod
+    def migrate_group(group, new_id):
+        old_id = group.group_id
+        group.group_id = new_id
+        DB.update_group(group)
+        group.group_id = old_id
+        DB.delete_group(group)
+
+    @staticmethod
+    def delete_group(group):
+        DB().__group_table.delete(group_id=group.group_id)
+
+    @staticmethod
     def get_user(user_id):
         user_data = DB().__user_table.find_one(user_id=user_id)
         if not user_data:
-            return User(user_id)
+            user = User(user_id)
+            user.save()
+            return user
 
         filtered_user_data = {_key: user_data[_key] for _key in User.get_keys() if _key in user_data}
         return User(**filtered_user_data)
@@ -459,11 +475,15 @@ class SudoHandler():
 class GreetingHandler():
     def __init__(self, dispatcher):
         start_handler = CommandHandler('start', GreetingHandler.start)
+        created_handler = MessageHandler(Filters.status_update.chat_created, GreetingHandler.created)
+        migrated_handler = MessageHandler(Filters.status_update.migrate, GreetingHandler.migrated)
         welcome_handler = MessageHandler(Filters.status_update.new_chat_members, GreetingHandler.welcome)
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
         togglewelcome_handler = CommandHandler('togglewelcome', GreetingHandler.toggle_welcome)
         toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
         dispatcher.add_handler(start_handler)
+        dispatcher.add_handler(created_handler)
+        dispatcher.add_handler(migrated_handler)
         dispatcher.add_handler(welcome_handler)
         dispatcher.add_handler(setwelcome_handler)
         dispatcher.add_handler(togglewelcome_handler)
@@ -532,6 +552,15 @@ class GreetingHandler():
         group.save()
 
         bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {})".format(str(enabled), group.welcome_enabled))
+
+    @staticmethod
+    def created(bot, update):
+        DB().get_group(update.message.chat.id)  # ensure creation
+
+    @staticmethod
+    def migrated(bot, update):
+        group = DB().get_group(update.message.migrate_from_chat_id)
+        DB.migrate_group(group, update.message.migrate_to_chat_id)
 
     @staticmethod
     def welcome(bot, update):
