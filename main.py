@@ -21,6 +21,7 @@ import re
 from collections import OrderedDict
 from copy import deepcopy
 from distutils.util import strtobool
+from math import ceil
 
 import dataset
 import requests
@@ -31,6 +32,25 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageH
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
+
+def ratelimited(function):
+    def wrapper(bot, update, **optional_args):
+        if update.message.chat.type != 'private':
+            group = DB().get_group(update.message.chat.id)
+            if group.commandratelimit > 0:
+                group_member = DB().get_groupmember(update.message.chat.id, update.message.from_user.id)
+                timediff = time.time() - group_member.lastcommandtime
+                if timediff < group.commandratelimit:
+                    member = update.message.chat.get_member(update.message.from_user.id)
+                    if member.status not in ['creator', 'administrator']:
+                        bot.send_message(chat_id=update.effective_chat.id, text="You're too spammy. Try again in {} seconds".format(ceil(group.commandratelimit - timediff)))
+                        return
+
+                group_member.lastcommandtime = time.time()
+                group_member.save()
+
+        return function(bot=bot, update=update, **optional_args)
+    return wrapper
 
 def busy_indicator(function):
     def wrapper(bot, update, **optional_args):
@@ -269,7 +289,7 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
@@ -282,10 +302,11 @@ class Group():
         self.auditlog = auditlog if auditlog is not None else json.dumps([])
         self.controlchannel_id = controlchannel_id
         self.roulettekicks_enabled = roulettekicks_enabled
+        self.commandratelimit = commandratelimit
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -300,15 +321,16 @@ class Group():
 
 
 class GroupMember():
-    def __init__(self, group_id, user_id, readrules=False, warnings=None):
+    def __init__(self, group_id, user_id, readrules=False, warnings=None, lastcommandtime=0):
         self.group_id = group_id
         self.user_id = user_id
         self.readrules = readrules
         self.warnings = warnings if warnings is not None else json.dumps([])
+        self.lastcommandtime = lastcommandtime
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'user_id', 'readrules', 'warnings']
+        return ['group_id', 'user_id', 'readrules', 'warnings', 'lastcommandtime']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in GroupMember.get_keys()}
@@ -503,6 +525,7 @@ class DebugHandler():
 
     @staticmethod
     @busy_indicator
+    @ratelimited
     def ping(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Pong.",
@@ -669,17 +692,18 @@ class GreetingHandler():
                     bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.id, can_send_messages=False)
 
 
-class GroupInfoHandler():
+class GroupStateHandler():
     def __init__(self, dispatcher):
-        description_handler = CommandHandler('description', GroupInfoHandler.description)
-        setdescription_handler = CommandHandler('setdescription', GroupInfoHandler.set_description)
-        relatedchats_handler = CommandHandler('relatedchats', GroupInfoHandler.relatedchats)
-        addrelatedchat_handler = CommandHandler('addrelatedchat', GroupInfoHandler.add_relatedchat)
-        removerelatedchat_handler = CommandHandler('removerelatedchat', GroupInfoHandler.remove_relatedchat)
-        invitelink_handler = CommandHandler('invitelink', GroupInfoHandler.invitelink)
-        revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupInfoHandler.revokeinvitelink)
-        controlchannel_handler = CommandHandler('controlchannel', GroupInfoHandler.controlchannel)
-        setcontrolchannel_handler = CommandHandler('setcontrolchannel', GroupInfoHandler.set_controlchannel)
+        description_handler = CommandHandler('description', GroupStateHandler.description)
+        setdescription_handler = CommandHandler('setdescription', GroupStateHandler.set_description)
+        relatedchats_handler = CommandHandler('relatedchats', GroupStateHandler.relatedchats)
+        addrelatedchat_handler = CommandHandler('addrelatedchat', GroupStateHandler.add_relatedchat)
+        removerelatedchat_handler = CommandHandler('removerelatedchat', GroupStateHandler.remove_relatedchat)
+        invitelink_handler = CommandHandler('invitelink', GroupStateHandler.invitelink)
+        revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupStateHandler.revokeinvitelink)
+        controlchannel_handler = CommandHandler('controlchannel', GroupStateHandler.controlchannel)
+        setcontrolchannel_handler = CommandHandler('setcontrolchannel', GroupStateHandler.set_controlchannel)
+        setcommandratelimit_handler = CommandHandler('setcommandratelimit', GroupStateHandler.set_commandratelimit)
         dispatcher.add_handler(description_handler)
         dispatcher.add_handler(setdescription_handler)
         dispatcher.add_handler(relatedchats_handler)
@@ -689,6 +713,7 @@ class GroupInfoHandler():
         dispatcher.add_handler(revokeinvitelink_handler)
         dispatcher.add_handler(controlchannel_handler)
         dispatcher.add_handler(setcontrolchannel_handler)
+        dispatcher.add_handler(setcommandratelimit_handler)
 
     @staticmethod
     @busy_indicator
@@ -900,6 +925,23 @@ class GroupInfoHandler():
         bot.export_chat_invite_link(update.message.chat.id)
         bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title))
 
+    @staticmethod
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def set_commandratelimit(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        text = "Member can now only execute one fun command per {} seconds."
+        try:
+            group.commandratelimit = int(update.message.text.split(' ', 1)[1])
+        except (IndexError, TypeError):
+            group.commandratelimit = 0
+            text = "Command rate limit reset to default ({} seconds)."
+
+        group.save()
+
+        bot.send_message(chat_id=update.effective_chat.id, text=text.format(group.commandratelimit))
+
 
 class RandomHandler():
     def __init__(self, dispatcher):
@@ -916,6 +958,7 @@ class RandomHandler():
 
     @staticmethod
     @busy_indicator
+    @ratelimited
     def roll(bot, update):
         try:
             roll = update.message.text.split(' ', 2)[1]
@@ -943,6 +986,7 @@ class RandomHandler():
 
     @staticmethod
     @busy_indicator
+    @ratelimited
     def flip(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Heads.",
@@ -952,6 +996,7 @@ class RandomHandler():
 
     @staticmethod
     @busy_indicator
+    @ratelimited
     def shake(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
             "It is certain.",
@@ -978,6 +1023,7 @@ class RandomHandler():
 
     @staticmethod
     @busy_indicator
+    @ratelimited
     def roulette(bot, update):
         group = DB().get_group(update.message.chat.id)
 
@@ -1372,7 +1418,7 @@ CallbackHandler(dispatcher)
 DebugHandler(dispatcher)
 SudoHandler(dispatcher)
 GreetingHandler(dispatcher)
-GroupInfoHandler(dispatcher)
+GroupStateHandler(dispatcher)
 RandomHandler(dispatcher)
 RuleHandler(dispatcher)
 ModerationHandler(dispatcher)
