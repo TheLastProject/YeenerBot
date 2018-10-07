@@ -37,7 +37,7 @@ def ratelimited(function):
     def wrapper(bot, update, **optional_args):
         if update.message.chat.type != 'private':
             group = DB().get_group(update.message.chat.id)
-            if group.commandratelimit > 0:
+            if group.commandratelimit:
                 group_member = DB().get_groupmember(update.message.chat.id, update.message.from_user.id)
                 timediff = time.time() - group_member.lastcommandtime
                 if timediff < group.commandratelimit:
@@ -238,6 +238,15 @@ class DB():
 
         filtered_user_data = {_key: user_data[_key] for _key in User.get_keys() if _key in user_data}
         return User(**filtered_user_data)
+
+    @staticmethod
+    def get_all_users():
+        users = []
+        for user_data in DB().__user_table.all():
+            filtered_user_data = {_key: user_data[_key] for _key in User.get_keys() if _key in user_data}
+            users.append(User(**filtered_user_data))
+
+        return users
 
     @staticmethod
     def update_user(user):
