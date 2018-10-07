@@ -165,6 +165,7 @@ class DB():
     __db = dataset.connect('sqlite:///data.db')
     __group_table = __db['group']
     __user_table = __db['user']
+    __groupmember_table = __db['groupmember']
 
     @staticmethod
     def get_group(group_id):
@@ -197,6 +198,11 @@ class DB():
         DB.update_group(group)
         group.group_id = old_id
         DB.delete_group(group)
+        for groupmember in DB.get_all_groupmembers(old_id):
+            groupmember.group_id = new_id
+            DB.update_groupmember(groupmember)
+            groupmember.group_id = old_id
+            DB.delete_groupmember(groupmember)
 
     @staticmethod
     def delete_group(group):
@@ -216,6 +222,30 @@ class DB():
     @staticmethod
     def update_user(user):
         DB().__user_table.upsert(user.serialize(), ['user_id'])
+
+    @staticmethod
+    def get_groupmember(group_id, user_id):
+        groupmember_data = DB().__groupmember_table.find_one(group_id=group_id, user_id=user_id)
+        if not groupmember_data:
+            groupmember = GroupMember(group_id, user_id)
+            groupmember.save()
+            return groupmember
+
+        filtered_groupmember_data = {_key: groupmember_data[_key] for _key in GroupMember.get_keys() if _key in groupmember_data}
+        return GroupMember(**filtered_groupmember_data)
+
+    @staticmethod
+    def get_all_groupmembers(group_id):
+        groupmembers = []
+        for groupmember_data in DB().__groupmember_table.find(group_id=group_id):
+            filtered_groupmember_data = {_key: groupmember_data[_key] for _key in GroupMember.get_keys() if _key in groupmember_data}
+            groupmembers.append(GroupMember(**filtered_groupmember_data))
+
+        return groupmembers
+
+    @staticmethod
+    def update_groupmember(groupmember):
+        DB().__groupmember_table.upsert(groupmember.serialize(), ['group_id', 'user_id'])
 
 
 class MessageCache():
@@ -239,25 +269,23 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
         self.forceruleread_enabled = forceruleread_enabled
-        self.readrules = readrules if readrules is not None else json.dumps([])
         self.description = description
         self.rules = rules
         self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
         self.bullet = bullet if bullet is not None else random.randint(0,5)
         self.chamber = chamber if chamber is not None else 5
-        self.warned = warned if warned is not None else json.dumps({})
         self.auditlog = auditlog if auditlog is not None else json.dumps([])
         self.controlchannel_id = controlchannel_id
         self.roulettekicks_enabled = roulettekicks_enabled
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'readrules', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -269,6 +297,24 @@ class Group():
         self.auditlog = json.dumps(auditlog)
 
         DB.update_group(self)
+
+
+class GroupMember():
+    def __init__(self, group_id, user_id, readrules=False, warnings=None):
+        self.group_id = group_id
+        self.user_id = user_id
+        self.readrules = readrules
+        self.warnings = warnings if warnings is not None else json.dumps([])
+
+    @staticmethod
+    def get_keys():
+        return ['group_id', 'user_id', 'readrules', 'warnings']
+
+    def serialize(self):
+        return {_key: getattr(self, _key) for _key in GroupMember.get_keys()}
+
+    def save(self):
+        DB.update_groupmember(self)
 
 
 class ErrorHandler():
@@ -616,10 +662,10 @@ class GreetingHandler():
 
         # Restrict users until they accept the rules if forceruleread is enabled
         if group.forceruleread_enabled:
-            readrules_ids = json.loads(group.readrules)
             for member in members:
                 chat_member = update.message.chat.get_member(member.id)
-                if member.id not in readrules_ids and chat_member.status == 'member':
+                groupmember = DB().get_groupmember(update.message.chat_id, member.id)
+                if not groupmember.readrules and chat_member.status == 'member':
                     bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.id, can_send_messages=False)
 
 
@@ -1017,16 +1063,15 @@ class RuleHandler():
     @resolve_chat
     def send_rules(bot, update):
         group = DB().get_group(update.message.chat.id)
+        groupmember = DB().get_groupmember(update.message.chat_id, update.message.from_user.id)
 
-        readrules_ids = json.loads(group.readrules)
-        if update.message.from_user.id not in readrules_ids:
+        if not groupmember.readrules:
             member = update.message.chat.get_member(update.message.from_user.id)
             if member.status == 'restricted':
                 bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
 
-            readrules_ids.append(update.message.from_user.id)
-            group.readrules = json.dumps(readrules_ids)
-            group.save()
+            groupmember.readrules = True
+            groupmember.save()
 
         # Notify control channel
         if group.controlchannel_id:
@@ -1135,14 +1180,14 @@ class ModerationHandler():
         else:
             message = update.message
 
-        group = DB().get_group(update.message.chat.id)
-        warnings = json.loads(group.warned)
-        if str(message.from_user.id) not in warnings:
+        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        warnings = json.loads(groupmember.warnings)
+        if not warnings:
             bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
-        for warning in reversed(warnings[str(message.from_user.id)]):
+        for warning in reversed(warnings):
             try:
                 warnedby = update.message.chat.get_member(warning['warnedby'])
             except TelegramError:
@@ -1161,23 +1206,21 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.")
             return
 
-        group = DB().get_group(update.message.chat.id)
-        warnings = json.loads(group.warned)
         message = update.message.reply_to_message
-        if str(message.from_user.id) not in warnings:
-            warnings[str(message.from_user.id)] = []
+        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        warnings = json.loads(groupmember.warnings)
 
         try:
             reason = update.message.text.split(' ', 1)[1]
         except IndexError:
             reason = None
 
-        warnings[str(message.from_user.id)].append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
-        group.warned = json.dumps(warnings)
-        group.save()
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        groupmember.warnings = json.dumps(warnings)
+        groupmember.save()
 
         warningtext = "{}, you just received a warning. Here are all warnings since you joined:\n".format(message.from_user.name)
-        for warning in reversed(warnings[str(message.from_user.id)]):
+        for warning in reversed(warnings):
             try:
                 warnedby = update.message.chat.get_member(warning['warnedby'])
             except TelegramError:
@@ -1196,12 +1239,12 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to clear the warnings of the person who wrote it.")
             return
 
-        group = DB().get_group(update.message.chat.id)
-        warnings = json.loads(group.warned)
         message = update.message.reply_to_message
-        warnings[str(message.from_user.id)] = []
-        group.warned = json.dumps(warnings)
-        group.save()
+        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        warnings = json.loads(groupmember.warnings)
+        warnings = []
+        groupmember.warnings = json.dumps(warnings)
+        groupmember.save()
 
         bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name))
 
@@ -1213,20 +1256,18 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.")
             return
 
-        group = DB().get_group(update.message.chat.id)
-        warnings = json.loads(group.warned)
         message = update.message.reply_to_message
-        if str(message.from_user.id) not in warnings:
-            warnings[str(message.from_user.id)] = []
+        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        warnings = json.loads(groupmember.warnings)
 
         try:
             reason = '[KICK] {}'.format(update.message.text.split(' ', 1)[1])
         except IndexError:
             reason = '[KICK]'
 
-        warnings[str(message.from_user.id)].append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
-        group.warned = json.dumps(warnings)
-        group.save()
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        groupmember.warnings = json.dumps(warnings)
+        groupmember.save()
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
@@ -1239,20 +1280,18 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to ban the person who wrote it.")
             return
 
-        group = DB().get_group(update.message.chat.id)
-        warnings = json.loads(group.warned)
         message = update.message.reply_to_message
-        if str(message.from_user.id) not in warnings:
-            warnings[str(message.from_user.id)] = []
+        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        warnings = json.loads(groupmember.warnings)
 
         try:
             reason = '[BAN] {}'.format(update.message.text.split(' ', 1)[1])
         except IndexError:
             reason = '[BAN]'
 
-        warnings[str(message.from_user.id)].append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
-        group.warned = json.dumps(warnings)
-        group.save()
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        groupmember.warnings = json.dumps(warnings)
+        groupmember.save()
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
 
