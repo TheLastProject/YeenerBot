@@ -239,7 +239,7 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None, controlchannel_id=None):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, readrules=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, warned=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
@@ -253,10 +253,11 @@ class Group():
         self.warned = warned if warned is not None else json.dumps({})
         self.auditlog = auditlog if auditlog is not None else json.dumps([])
         self.controlchannel_id = controlchannel_id
+        self.roulettekicks_enabled = roulettekicks_enabled
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'readrules', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog', 'controlchannel_id']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'readrules', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'warned', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled']
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -860,10 +861,12 @@ class RandomHandler():
         flip_handler = CommandHandler('flip', RandomHandler.flip)
         shake_handler = CommandHandler('shake', RandomHandler.shake)
         roulette_handler = CommandHandler('roulette', RandomHandler.roulette)
+        toggleroulettekicks_handler = CommandHandler('toggleroulettekicks', RandomHandler.toggle_roulettekicks)
         dispatcher.add_handler(roll_handler)
         dispatcher.add_handler(flip_handler)
         dispatcher.add_handler(shake_handler)
         dispatcher.add_handler(roulette_handler)
+        dispatcher.add_handler(toggleroulettekicks_handler)
 
     @staticmethod
     @busy_indicator
@@ -945,6 +948,9 @@ class RandomHandler():
             group.bullet = random.randint(0,5)
             group.chamber = 5
             group.save()
+            if not group.roulette_kicks:
+                return
+
             if update.message.chat.type == 'private':
                 return
 
@@ -962,6 +968,24 @@ class RandomHandler():
         else:
             chambersremaining = 5 - group.chamber
             bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""))
+
+    @staticmethod
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def toggle_roulettekicks(bot, update):
+        group = DB().get_group(update.message.chat.id)
+
+        try:
+            enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
+        except (IndexError, ValueError):
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.roulettekicks_enabled))
+            return
+
+        group.roulettekicks_enabled = enabled
+        group.save()
+
+        bot.send_message(chat_id=update.effective_chat.id, text="Roulette kicks: {}".format(str(enabled)))
 
 
 class RuleHandler():
