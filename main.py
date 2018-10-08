@@ -710,7 +710,7 @@ class GroupStateHandler():
         removerelatedchat_handler = CommandHandler('removerelatedchat', GroupStateHandler.remove_relatedchat)
         invitelink_handler = CommandHandler('invitelink', GroupStateHandler.invitelink)
         revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupStateHandler.revokeinvitelink)
-        controlchannel_handler = CommandHandler('controlchannel', GroupStateHandler.controlchannel)
+        controlchat_handler = CommandHandler('controlchat', GroupStateHandler.controlchat)
         setcontrolchat_handler = CommandHandler('setcontrolchat', GroupStateHandler.set_controlchat)
         setcommandratelimit_handler = CommandHandler('setcommandratelimit', GroupStateHandler.set_commandratelimit)
         dispatcher.add_handler(description_handler)
@@ -720,7 +720,7 @@ class GroupStateHandler():
         dispatcher.add_handler(removerelatedchat_handler)
         dispatcher.add_handler(invitelink_handler)
         dispatcher.add_handler(revokeinvitelink_handler)
-        dispatcher.add_handler(controlchannel_handler)
+        dispatcher.add_handler(controlchat_handler)
         dispatcher.add_handler(setcontrolchat_handler)
         dispatcher.add_handler(setcommandratelimit_handler)
 
@@ -836,12 +836,12 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def controlchannel(bot, update):
+    def controlchat(bot, update):
         group = DB().get_group(update.message.chat.id)
         if group.controlchannel_id:
-            message = "{}\n\nControl channel:\n{}".format(update.message.chat.title, bot.get_chat(group.controlchannel_id).title)
+            message = "{}\n\nControl chat:\n{}".format(update.message.chat.title, bot.get_chat(group.controlchannel_id).title)
         else:
-            message = "{}\n\nNo known control channel".format(update.message.chat.title)
+            message = "{}\n\nNo known control chat".format(update.message.chat.title)
 
         bot.send_message(chat_id=update.effective_chat.id, text=message)
 
