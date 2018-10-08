@@ -711,7 +711,7 @@ class GroupStateHandler():
         invitelink_handler = CommandHandler('invitelink', GroupStateHandler.invitelink)
         revokeinvitelink_handler = CommandHandler('revokeinvitelink', GroupStateHandler.revokeinvitelink)
         controlchannel_handler = CommandHandler('controlchannel', GroupStateHandler.controlchannel)
-        setcontrolchannel_handler = CommandHandler('setcontrolchannel', GroupStateHandler.set_controlchannel)
+        setcontrolchat_handler = CommandHandler('setcontrolchat', GroupStateHandler.set_controlchat)
         setcommandratelimit_handler = CommandHandler('setcommandratelimit', GroupStateHandler.set_commandratelimit)
         dispatcher.add_handler(description_handler)
         dispatcher.add_handler(setdescription_handler)
@@ -721,7 +721,7 @@ class GroupStateHandler():
         dispatcher.add_handler(invitelink_handler)
         dispatcher.add_handler(revokeinvitelink_handler)
         dispatcher.add_handler(controlchannel_handler)
-        dispatcher.add_handler(setcontrolchannel_handler)
+        dispatcher.add_handler(setcontrolchat_handler)
         dispatcher.add_handler(setcommandratelimit_handler)
 
     @staticmethod
@@ -849,7 +849,7 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def set_controlchannel(bot, update):
+    def set_controlchat(bot, update):
         chat_id = update.message.text.split(' ')[1:]
         if len(chat_id) == 0:
             chats = []
@@ -873,11 +873,11 @@ class GroupStateHandler():
                 bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
                 return
 
-            keyboard_buttons = [InlineKeyboardButton("[REMOVE CONTROL CHANNEL]", callback_data='{}_/setcontrolchannel -1'.format(update.message.chat.id))]
+            keyboard_buttons = [InlineKeyboardButton("[REMOVE CONTROL CHAT]", callback_data='{}_/setcontrolchat -1'.format(update.message.chat.id))]
             for chat in chats:
-                keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchannel {}'.format(update.message.chat.id, chat.id)))
+                keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchat {}'.format(update.message.chat.id, chat.id)))
             keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a control channel?", reply_markup=keyboard)
+            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a control chat?", reply_markup=keyboard)
             return
 
         group = DB().get_group(update.message.chat.id)
