@@ -78,11 +78,11 @@ def ensure_admin(function):
         if not (command == '/auditlog' or command.startswith('/auditlog@')):
             group = DB().get_group(update.message.chat.id)
             auditlog = json.loads(group.auditlog)
-            auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text})
+            auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text, 'inreplyto': update.message.reply_to_message.from_user.id if update.message.reply_to_message else None})
             group.auditlog = json.dumps(auditlog)
             group.save()
             if group.controlchannel_id:
-                audittext = "[{}] {}: {}".format(str(datetime.datetime.fromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], update.message.from_user.name, auditlog[-1]['command'])
+                audittext = "[{}] {}{}: {}".format(str(datetime.datetime.fromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(update.message.reply_to_message.from_user.name) if update.message.reply_to_message else "", auditlog[-1]['command'])
                 bot.send_message(chat_id=group.controlchannel_id, text="{}\n\n{}".format(update.message.chat.title, audittext))
 
         return function(bot=bot, update=update, **optional_args)
@@ -1221,7 +1221,17 @@ class ModerationHandler():
                 # If we can't find the user in the chat anymore, assume they're no longer a mod.
                 continue
 
-            audittext += "\n[{}] {}: {}".format(str(datetime.datetime.fromtimestamp(auditentry['timestamp'])).split(".")[0], member.user.name, auditentry['command'])
+            # Old auditentries lack inreplyto, don't crash
+            if 'inreplyto' not in auditentry:
+                auditentry['inreplyto'] = None
+
+            if auditentry['inreplyto']:
+                try:
+                    auditentry['inreplyto'] = update.message.chat.get_member(auditentry['inreplyto']).user.name
+                except TelegramError:
+                    pass
+
+            audittext += "\n[{}] {}{}: {}".format(str(datetime.datetime.fromtimestamp(auditentry['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(auditentry['inreplyto']) if auditentry['inreplyto'] else "", auditentry['command'])
 
         bot.send_message(chat_id=update.message.from_user.id, text=audittext)
 
@@ -1326,6 +1336,7 @@ class ModerationHandler():
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name))
 
     @staticmethod
     @busy_indicator
@@ -1349,6 +1360,7 @@ class ModerationHandler():
         groupmember.save()
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've banned {}.".format(message.from_user.name))
 
     @staticmethod
     @busy_indicator
