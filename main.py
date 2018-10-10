@@ -1049,7 +1049,7 @@ class RandomHandler():
             group.bullet = random.randint(0,5)
             group.chamber = 5
             group.save()
-            if not group.roulette_kicks:
+            if not group.roulettekicks_enabled:
                 return
 
             if update.message.chat.type == 'private':
