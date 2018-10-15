@@ -683,14 +683,24 @@ class GreetingHandler():
                                  'invite_link': invite_link,
                                  'mods': ", ".join(Helpers.list_mods(update.message.chat)),
                                  'description': description,
-                                 'forceruleread_text': 'This group requires new members to read the rules before they can send messages. ' if group.forceruleread_enabled else '',
                                  'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)})
 
-        text = group.welcome_message if group.welcome_message else "Hello {usernames}, welcome to {title}! {forceruleread_text}Please make sure to read the /rules by pressing the button below."
+        if group.welcome_message:
+            text = group.welcome_message
+        elif group.rules and group.forceruleread_enabled:
+            text = "Hello {usernames}, welcome to {title}! This group requires new members to read the rules before they can send messages. Please make sure to read the /rules by pressing the button below."
+        elif group.rules:
+            text = "Hello {usernames}, welcome to {title}! Please make sure to read the /rules by pressing the button below."
+        else:
+            text = "Hello {usernames}, welcome to {title}!"
+
+        keyboard = None
+        if group.rules:
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]])
 
         bot.send_message(chat_id=update.message.chat_id,
                          text=text.format(**data),
-                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]]))
+                         reply_markup=keyboard)
 
         # Restrict users until they accept the rules if forceruleread is enabled
         if group.forceruleread_enabled:
