@@ -646,7 +646,7 @@ class GreetingHandler():
         group.forceruleread_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {})".format(str(enabled), group.welcome_enabled))
+        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), group.welcome_enabled, group.rules != None))
 
     @staticmethod
     def created(bot, update):
@@ -703,7 +703,7 @@ class GreetingHandler():
                          reply_markup=keyboard)
 
         # Restrict users until they accept the rules if forceruleread is enabled
-        if group.forceruleread_enabled:
+        if group.rules and group.forceruleread_enabled:
             for member in members:
                 chat_member = update.message.chat.get_member(member.id)
                 groupmember = DB().get_groupmember(update.message.chat_id, member.id)
