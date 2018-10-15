@@ -82,7 +82,7 @@ def ensure_admin(function):
             group.auditlog = json.dumps(auditlog)
             group.save()
             if group.controlchannel_id:
-                audittext = "[{}] {}{}: {}".format(str(datetime.datetime.fromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(update.message.reply_to_message.from_user.name) if update.message.reply_to_message else "", auditlog[-1]['command'])
+                audittext = "[{} UTC] {}{}: {}".format(str(datetime.datetime.utcfromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(update.message.reply_to_message.from_user.name) if update.message.reply_to_message else "", auditlog[-1]['command'])
                 bot.send_message(chat_id=group.controlchannel_id, text="{}\n\n{}".format(update.message.chat.title, audittext))
 
         return function(bot=bot, update=update, **optional_args)
@@ -1231,7 +1231,7 @@ class ModerationHandler():
                 except TelegramError:
                     pass
 
-            audittext += "\n[{}] {}{}: {}".format(str(datetime.datetime.fromtimestamp(auditentry['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(auditentry['inreplyto']) if auditentry['inreplyto'] else "", auditentry['command'])
+            audittext += "\n[{} UTC] {}{}: {}".format(str(datetime.datetime.utcfromtimestamp(auditentry['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(auditentry['inreplyto']) if auditentry['inreplyto'] else "", auditentry['command'])
 
         bot.send_message(chat_id=update.message.from_user.id, text=audittext)
 
@@ -1259,7 +1259,7 @@ class ModerationHandler():
                 # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
                 continue
 
-            warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
+            warningtext += "\n[{} UTC] warned by {} (reason: {})".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
         bot.send_message(chat_id=update.effective_chat.id, text=warningtext)
 
@@ -1292,7 +1292,7 @@ class ModerationHandler():
                 # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
                 continue
 
-            warningtext += "\n[{}] warned by {} (reason: {})".format(str(datetime.datetime.fromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
+            warningtext += "\n[{} UTC] warned by {} (reason: {})".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
         bot.send_message(chat_id=update.message.chat.id, text=warningtext)
 
