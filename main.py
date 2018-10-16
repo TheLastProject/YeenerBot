@@ -618,7 +618,7 @@ class GreetingHandler():
             group.welcome_message = update.message.text.split(' ', 1)[1]
             group.save()
         except IndexError:
-            text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before the can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
+            text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before they can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
 
         bot.send_message(chat_id=update.effective_chat.id, text=text)
 
@@ -682,7 +682,7 @@ class GreetingHandler():
         if group.welcome_message:
             text = group.welcome_message
         else:
-            text = "Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before the can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
+            text = "Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before they can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
 
         keyboard = None
         if group.rules:
