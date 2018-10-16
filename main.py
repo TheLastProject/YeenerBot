@@ -1142,13 +1142,6 @@ class RuleHandler():
             groupmember.readrules = True
             groupmember.save()
 
-        # Notify control channel
-        if group.controlchannel_id:
-            try:
-                bot.send_message(chat_id=group.controlchannel_id, text="{} just requested the rules for {}".format(update.message.from_user.name, update.message.chat.title))
-            except Unauthorized:
-                pass
-
         if not group.rules:
             bot.send_message(chat_id=update.effective_chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
             return
