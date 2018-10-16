@@ -26,6 +26,7 @@ from math import ceil
 import dataset
 import requests
 
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import Unauthorized, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
@@ -569,6 +570,7 @@ class GreetingHandler():
         created_handler = MessageHandler(Filters.status_update.chat_created, GreetingHandler.created)
         migrated_handler = MessageHandler(Filters.status_update.migrate, GreetingHandler.migrated)
         welcome_handler = MessageHandler(Filters.status_update.new_chat_members, GreetingHandler.welcome)
+        clearwelcome_handler = CommandHandler('clearwelcome', GreetingHandler.clear_welcome)
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
         togglewelcome_handler = CommandHandler('togglewelcome', GreetingHandler.toggle_welcome)
         toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
@@ -599,16 +601,24 @@ class GreetingHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
+    def clear_welcome(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        group.welcome_message = None
+        group.save()
+        bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.")
+
+    @staticmethod
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
     def set_welcome(bot, update):
         group = DB().get_group(update.message.chat.id)
         text = "Welcome message set."
         try:
             group.welcome_message = update.message.text.split(' ', 1)[1]
+            group.save()
         except IndexError:
-            group.welcome_message = None
-            text = "Welcome message reset to default."
-
-        group.save()
+            text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before the can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
 
         bot.send_message(chat_id=update.effective_chat.id, text=text)
 
@@ -669,46 +679,30 @@ class GreetingHandler():
         if len(members) == 0:
             return
 
-        try:
-            invite_link = Helpers.get_invite_link(bot, update.message.chat)
-        except TelegramError:
-            invite_link = None
-
-        description = Helpers.get_description(bot, update.message.chat, group)
-        if not description:
-            description = "No description"
-
-        data = dict_no_keyerror({'usernames': ", ".join(member.name for member in members),
-                                 'title': update.message.chat.title,
-                                 'invite_link': invite_link,
-                                 'mods': ", ".join(Helpers.list_mods(update.message.chat)),
-                                 'description': description,
-                                 'rules_with_start': 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id)})
-
         if group.welcome_message:
             text = group.welcome_message
-        elif group.rules and group.forceruleread_enabled:
-            text = "Hello {usernames}, welcome to {title}! This group requires new members to read the rules before they can send messages. Please make sure to read the /rules by pressing the button below."
-        elif group.rules:
-            text = "Hello {usernames}, welcome to {title}! Please make sure to read the /rules by pressing the button below."
         else:
-            text = "Hello {usernames}, welcome to {title}!"
+            text = "Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before the can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
 
         keyboard = None
         if group.rules:
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url=data['rules_with_start'])]])
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url='https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))]])
 
-        bot.send_message(chat_id=update.message.chat_id,
-                         text=text.format(**data),
-                         reply_markup=keyboard)
+        env = ImmutableSandboxedEnvironment()
+        for member in members:
+            member = update.message.chat.get_member(member.id)
+            memberinfo = DB().get_groupmember(update.message.chat_id, member.user.id)
+            try:
+                formatted_string = env.from_string(text).render({'member': member, 'user': member.user, 'group': group, 'memberinfo': memberinfo, 'chat': update.message.chat})
+            except Exception as e:
+                formatted_string = e
+            bot.send_message(chat_id=update.message.chat_id,
+                             text=formatted_string,
+                             reply_markup=keyboard)
 
-        # Restrict users until they accept the rules if forceruleread is enabled
-        if group.rules and group.forceruleread_enabled:
-            for member in members:
-                chat_member = update.message.chat.get_member(member.id)
-                groupmember = DB().get_groupmember(update.message.chat_id, member.id)
-                if not groupmember.readrules and chat_member.status == 'member':
-                    bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.id, can_send_messages=False)
+            if group.rules and group.forceruleread_enabled:
+                if not memberinfo.readrules and member.status == 'member':
+                    bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, can_send_messages=False)
 
 
 class GroupStateHandler():
@@ -1102,9 +1096,21 @@ class RandomHandler():
 class RuleHandler():
     def __init__(self, dispatcher):
         rules_handler = CommandHandler('rules', RuleHandler.send_rules)
+        clearrules_handler = CommandHandler('clearrules', RuleHandler.clear_rules)
         setrules_handler = CommandHandler('setrules', RuleHandler.set_rules)
         dispatcher.add_handler(rules_handler)
+        dispatcher.add_handler(clearrules_handler)
         dispatcher.add_handler(setrules_handler)
+
+    @staticmethod
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def clear_rules(bot, update):
+        group = DB().get_group(update.message.chat.id)
+        group.rules = None
+        group.save()
+        bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.")
 
     @staticmethod
     @busy_indicator
@@ -1115,11 +1121,9 @@ class RuleHandler():
         text = "Rules set."
         try:
             group.rules = update.message.text.split(' ', 1)[1]
+            group.save()
         except IndexError:
-            group.rules = None
-            text = "Rules removed."
-
-        group.save()
+            text = "You need to give the rules in the same message.\n\nExample:\n/setrules The only rule is that there are no rules. Except this one."
 
         bot.send_message(chat_id=update.effective_chat.id, text=text)
 
