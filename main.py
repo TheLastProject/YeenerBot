@@ -127,7 +127,10 @@ def resolve_chat(function):
                     continue
 
                 chats.append(chat)
-            except TelegramError:
+            except TelegramError as e:
+                if (e.message == "Chat not found"):
+                    DB.delete_group(group)
+
                 continue
 
         if len(chats) == 0:
@@ -228,6 +231,8 @@ class DB():
     @staticmethod
     def delete_group(group):
         DB().__group_table.delete(group_id=group.group_id)
+        for groupmember in DB.get_all_groupmembers(group.group_id):
+            DB.delete_groupmember(groupmember)
 
     @staticmethod
     def get_user(user_id):
@@ -487,7 +492,10 @@ class CallbackHandler():
                         continue
 
                     chats.append(chat)
-                except TelegramError:
+                except TelegramError as e:
+                    if (e.message == "Chat not found"):
+                        DB.delete_group(group)
+
                     continue
         else:
             chats = [bot.get_chat(chat_id)]
@@ -784,7 +792,10 @@ class GroupStateHandler():
                         continue
 
                     chats.append(chat)
-                except TelegramError:
+                except TelegramError as e:
+                    if (e.message == "Chat not found"):
+                        DB.delete_group(group)
+
                     continue
 
             if len(chats) == 0:
@@ -871,7 +882,11 @@ class GroupStateHandler():
                         continue
 
                     chats.append(chat)
-                except TelegramError:
+
+                except TelegramError as e:
+                    if (e.message == "Chat not found"):
+                        DB.delete_group(group)
+
                     continue
 
             if len(chats) == 0:
