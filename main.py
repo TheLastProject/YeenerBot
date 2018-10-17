@@ -578,6 +578,7 @@ class GreetingHandler():
         dispatcher.add_handler(created_handler)
         dispatcher.add_handler(migrated_handler)
         dispatcher.add_handler(welcome_handler)
+        dispatcher.add_handler(clearwelcome_handler)
         dispatcher.add_handler(setwelcome_handler)
         dispatcher.add_handler(togglewelcome_handler)
         dispatcher.add_handler(toggleforceruleread_handler)
