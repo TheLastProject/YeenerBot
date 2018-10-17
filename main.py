@@ -118,6 +118,7 @@ def resolve_chat(function):
                 chat = bot.get_chat(group.group_id)
 
                 if chat.type == 'private':
+                    DB.delete_group(group)
                     continue
 
                 if chat.id == update.message.chat_id:
@@ -480,6 +481,7 @@ class CallbackHandler():
                     chat = bot.get_chat(group.group_id)
 
                     if chat.type == 'private':
+                        DB.delete_group(group)
                         continue
 
                     if str(chat.id) in control_channels:
@@ -783,6 +785,7 @@ class GroupStateHandler():
                 try:
                     chat = bot.get_chat(group.group_id)
                     if chat.type == 'private':
+                        DB.delete_group(group)
                         continue
 
                     if chat.id == update.message.chat_id:
@@ -873,6 +876,7 @@ class GroupStateHandler():
                 try:
                     chat = bot.get_chat(group.group_id)
                     if chat.type == 'private':
+                        DB.delete_group(group)
                         continue
 
                     if chat.id == update.message.chat_id:
