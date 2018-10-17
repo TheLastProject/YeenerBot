@@ -30,6 +30,7 @@ from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import Unauthorized, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
+from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -380,12 +381,14 @@ class ErrorHandler():
 
 class Helpers():
     @staticmethod
+    @run_async
     def get_creator(chat):
         for admin in chat.get_administrators():
             if admin.status == "creator":
                 return admin.user
 
     @staticmethod
+    @run_async
     def list_mods(chat):
         creator = None
         mods = []
@@ -411,6 +414,7 @@ class Helpers():
         return group.description if group.description else bot.get_chat(chat.id).description
 
     @staticmethod
+    @run_async
     def get_invite_link(bot, chat):
         if not chat.invite_link:
             chat.invite_link = bot.export_chat_invite_link(chat.id)
@@ -546,6 +550,7 @@ class DebugHandler():
     @staticmethod
     @busy_indicator
     @ratelimited
+    @run_async
     def ping(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Pong.",
@@ -942,6 +947,7 @@ class GroupStateHandler():
     @staticmethod
     @busy_indicator
     @resolve_chat
+    @run_async
     def invitelink(bot, update):
         invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
@@ -954,6 +960,7 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
+    @run_async
     def revokeinvitelink(bot, update):
         bot.export_chat_invite_link(update.message.chat.id)
         bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title))
@@ -992,6 +999,7 @@ class RandomHandler():
     @staticmethod
     @busy_indicator
     @ratelimited
+    @run_async
     def roll(bot, update):
         try:
             roll = update.message.text.split(' ', 2)[1]
@@ -1020,6 +1028,7 @@ class RandomHandler():
     @staticmethod
     @busy_indicator
     @ratelimited
+    @run_async
     def flip(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Heads.",
@@ -1030,6 +1039,7 @@ class RandomHandler():
     @staticmethod
     @busy_indicator
     @ratelimited
+    @run_async
     def shake(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
             "It is certain.",
@@ -1393,12 +1403,14 @@ class ModerationHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
+    @run_async
     def say(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text=" ".join(update.message.text.split(' ')[1:]))
 
     @staticmethod
     @busy_indicator
     @requires_confirmation
+    @run_async
     def call_mods(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name))
 
@@ -1411,6 +1423,7 @@ class SauceNaoHandler():
 
     @staticmethod
     @busy_indicator
+    @run_async
     def get_source(bot, update):
         if not update.message.reply_to_message:
             bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.")
