@@ -381,14 +381,12 @@ class ErrorHandler():
 
 class Helpers():
     @staticmethod
-    @run_async
     def get_creator(chat):
         for admin in chat.get_administrators():
             if admin.status == "creator":
                 return admin.user
 
     @staticmethod
-    @run_async
     def list_mods(chat):
         creator = None
         mods = []
@@ -414,7 +412,6 @@ class Helpers():
         return group.description if group.description else bot.get_chat(chat.id).description
 
     @staticmethod
-    @run_async
     def get_invite_link(bot, chat):
         if not chat.invite_link:
             chat.invite_link = bot.export_chat_invite_link(chat.id)
