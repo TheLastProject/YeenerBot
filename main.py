@@ -1305,6 +1305,10 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.")
             return
 
+        if update.message.reply_to_message.from_user.id == bot.id:
+            bot.send_message(chat_id=update.message.chat.id, text=random.choice(["What did I even do!", "I'm just trying to help!", "Have you checked /auditlog to find the real culprit?", "I-I'm sorry..."]))
+            return
+
         message = update.message.reply_to_message
         groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
