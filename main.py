@@ -45,7 +45,7 @@ def ratelimited(function):
                 if timediff < group.commandratelimit:
                     member = update.message.chat.get_member(update.message.from_user.id)
                     if member.status not in ['creator', 'administrator']:
-                        bot.send_message(chat_id=update.effective_chat.id, text="You're too spammy. Try again in {} seconds".format(ceil(group.commandratelimit - timediff)))
+                        bot.send_message(chat_id=update.effective_chat.id, text="You're too spammy. Try again in {} seconds".format(ceil(group.commandratelimit - timediff)), reply_to_message_id=update.message.message_id)
                         return
 
                 group_member.lastcommandtime = time.time()
@@ -68,12 +68,12 @@ def ensure_admin(function):
         member = update.message.chat.get_member(update.message.from_user.id)
         if member.status not in ['creator', 'administrator']:
             if update.message.from_user.id not in superadmins:
-                bot.send_message(chat_id=update.effective_chat.id, text="You do not have the required permission to do this.")
+                bot.send_message(chat_id=update.effective_chat.id, text="You do not have the required permission to do this.", reply_to_message_id=update.message.message_id)
                 return
 
             user = DB().get_user(update.message.from_user.id)
             if time.time() - user.sudo_time > 30:
-                bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).")
+                bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).", reply_to_message_id=update.message.message_id)
                 return
 
         command = update.message.text.split(' ', 1)[0]
@@ -140,7 +140,7 @@ def resolve_chat(function):
                 message = "You are not in any chats relevant to this control channel."
             else:
                 message = "You are not in any chats known to me."
-            bot.send_message(chat_id=update.message.chat_id, text=message)
+            bot.send_message(chat_id=update.message.chat_id, text=message, reply_to_message_id=update.message.message_id)
             return
 
         MessageCache.messages[update.message.chat.id] = update.message
@@ -148,7 +148,7 @@ def resolve_chat(function):
         for chat in chats:
             keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
         keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-        bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard)
+        bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
 
     return wrapper
 
@@ -160,7 +160,7 @@ def requires_confirmation(function):
             MessageCache.messages[update.message.chat.id] = cloned_message
             yes_button = InlineKeyboardButton("Yes, I am sure", callback_data=update.message.chat.id)
             keyboard = InlineKeyboardMarkup([[yes_button]])
-            bot.send_message(chat_id=update.message.chat_id, text="Are you really sure you want to run '{}'?".format(update.message.text), reply_markup=keyboard)
+            bot.send_message(chat_id=update.message.chat_id, text="Are you really sure you want to run '{}'?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         # Remove really sure parameter
@@ -373,10 +373,10 @@ class ErrorHandler():
 
         if type(error) == Unauthorized:
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
-            bot.send_message(chat_id=update.effective_chat.id, text=text)
+            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
         else:
             text = "An error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
-            bot.send_message(chat_id=update.effective_chat.id, text=text)
+            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
 
 class Helpers():
@@ -536,7 +536,7 @@ class CallbackHandler():
 
         MessageCache.messages[update.message.chat_id] = update.message
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('/{}'.format(command), callback_data='{}_/{}'.format(update.message.chat.id, command))] for command in supported_commands])
-        bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard)
+        bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
 
 
 class DebugHandler():
@@ -553,7 +553,7 @@ class DebugHandler():
             "Pong.",
             "Ha! I win.",
             "Damn, I missed!"
-        ], weights=[90,5,5])[0]))
+        ], weights=[90,5,5])[0]), reply_to_message_id=update.message.message_id)
 
 
 class SudoHandler():
@@ -565,7 +565,7 @@ class SudoHandler():
     @busy_indicator
     def sudo(bot, update):
         if update.message.from_user.id not in superadmins:
-            bot.send_message(chat_id=update.message.chat_id, text="{} is not a superadmin. This incident will be reported.".format(update.message.from_user.name))
+            bot.send_message(chat_id=update.message.chat_id, text="{} is not a superadmin. This incident will be reported.".format(update.message.from_user.name), reply_to_message_id=update.message.message_id)
             print("{} ({}) tried to use sudo but was denied".format(update.message.from_user.name, update.message.from_user.id))
             return
 
@@ -573,7 +573,7 @@ class SudoHandler():
         user.sudo_time = time.time()
         user.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 30 seconds).")
+        bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 30 seconds).", reply_to_message_id=update.message.message_id)
 
 
 class GreetingHandler():
@@ -618,7 +618,7 @@ class GreetingHandler():
         group = DB().get_group(update.message.chat.id)
         group.welcome_message = None
         group.save()
-        bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.")
+        bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -633,7 +633,7 @@ class GreetingHandler():
         except IndexError:
             text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before they can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text)
+        bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -645,13 +645,13 @@ class GreetingHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled))
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled), reply_to_message_id=update.message.message_id)
             return
 
         group.welcome_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Welcome: {}".format(str(enabled)))
+        bot.send_message(chat_id=update.effective_chat.id, text="Welcome: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -663,13 +663,13 @@ class GreetingHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.forceruleread_enabled))
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.forceruleread_enabled), reply_to_message_id=update.message.message_id)
             return
 
         group.forceruleread_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), group.welcome_enabled, group.rules != None))
+        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), group.welcome_enabled, group.rules is not None), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     def created(bot, update):
@@ -771,9 +771,9 @@ class GroupStateHandler():
                     continue
 
             message += "\n----\n".join(related_chats_text)
-            bot.send_message(chat_id=update.message.from_user.id, text=message)
+            bot.send_message(chat_id=update.message.from_user.id, text=message, reply_to_message_id=update.message.message_id)
         else:
-            bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title))
+            bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -804,11 +804,11 @@ class GroupStateHandler():
                     continue
 
             if len(chats) == 0:
-                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
+                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.", reply_to_message_id=update.message.message_id)
                 return
 
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/addrelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
-            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a related chat?", reply_markup=keyboard)
+            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a related chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         group = DB().get_group(update.message.chat.id)
@@ -839,9 +839,9 @@ class GroupStateHandler():
 
             if len(chats) > 0:
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/removerelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
-                bot.send_message(chat_id=update.effective_chat.id, text="Remove which chat from related chats?", reply_markup=keyboard)
+                bot.send_message(chat_id=update.effective_chat.id, text="Remove which chat from related chats?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             else:
-                bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title))
+                bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
             return
 
         for chat_id in chat_ids:
@@ -864,7 +864,7 @@ class GroupStateHandler():
         else:
             message = "{}\n\nNo known control chat".format(update.message.chat.title)
 
-        bot.send_message(chat_id=update.effective_chat.id, text=message)
+        bot.send_message(chat_id=update.effective_chat.id, text=message, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -896,14 +896,14 @@ class GroupStateHandler():
                     continue
 
             if len(chats) == 0:
-                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.")
+                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.", reply_to_message_id=update.message.message_id)
                 return
 
             keyboard_buttons = [InlineKeyboardButton("[REMOVE CONTROL CHAT]", callback_data='{}_/setcontrolchat -1'.format(update.message.chat.id))]
             for chat in chats:
                 keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchat {}'.format(update.message.chat.id, chat.id)))
             keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a control chat?", reply_markup=keyboard)
+            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a control chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         group = DB().get_group(update.message.chat.id)
@@ -922,7 +922,7 @@ class GroupStateHandler():
         if not description:
             description = "No description"
 
-        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
+        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -939,7 +939,7 @@ class GroupStateHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text)
+        bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -948,10 +948,10 @@ class GroupStateHandler():
     def invitelink(bot, update):
         invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
-            bot.send_message(chat_id=update.effective_chat.id, text="{} does not have an invite link".format(update.message.chat.title))
+            bot.send_message(chat_id=update.effective_chat.id, text="{} does not have an invite link".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link))
+        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -960,7 +960,7 @@ class GroupStateHandler():
     @run_async
     def revokeinvitelink(bot, update):
         bot.export_chat_invite_link(update.message.chat.id)
-        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title))
+        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -977,7 +977,7 @@ class GroupStateHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text.format(group.commandratelimit))
+        bot.send_message(chat_id=update.effective_chat.id, text=text.format(group.commandratelimit), reply_to_message_id=update.message.message_id)
 
 
 class RandomHandler():
@@ -1005,22 +1005,26 @@ class RandomHandler():
             dice = [1, 20]
 
         if dice[0] < 1 or dice[1] < 1:
-            bot.send_message(chat_id=update.message.chat_id, text="Very funny.")
+            bot.send_message(chat_id=update.message.chat_id, text="Very funny.", reply_to_message_id=update.message.message_id)
+            return
+
+        if dice[1] == 1:
+            bot.send_message(chat_id=update.message.chat_id, text="I'm here to roll dice, not calculate 1+1...", reply_to_message_id=update.message.message_id)
             return
 
         if dice[0] > 100 or dice[1] > 100:
-            bot.send_message(chat_id=update.message.chat_id, text="Sorry, but I'm limited to 100d100.")
+            bot.send_message(chat_id=update.message.chat_id, text="Sorry, but I'm limited to 100d100.", reply_to_message_id=update.message.message_id)
             return
 
         if dice[0] == 1:
-            bot.send_message(chat_id=update.message.chat_id, text=str(random.randint(1, dice[1])))
+            bot.send_message(chat_id=update.message.chat_id, text=str(random.randint(1, dice[1])), reply_to_message_id=update.message.message_id)
             return
 
         results = []
         for i in range(0, dice[0]):
             results.append(random.randint(1, dice[1]))
 
-        bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" + ".join([str(result) for result in results]), str(sum(results))))
+        bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" + ".join([str(result) for result in results]), str(sum(results))), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1031,7 +1035,7 @@ class RandomHandler():
             "Heads.",
             "Tails.",
             "The coin has landed sideways."
-        ], weights=[45,45,10])[0]))
+        ], weights=[45,45,10])[0]), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1059,7 +1063,7 @@ class RandomHandler():
             "My sources say no.",
             "Outlook not so good.",
             "Very doubtful."
-        ])))
+        ])), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1076,7 +1080,7 @@ class RandomHandler():
 
         # Check if bullet is in chamber
         if group.bullet == group.chamber:
-            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *BOOM!* Your brain is now all over the wall behind you.</code>")
+            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *BOOM!* Your brain is now all over the wall behind you.</code>", reply_to_message_id=update.message.message_id)
             group.bullet = random.randint(0,5)
             group.chamber = 5
             group.save()
@@ -1099,7 +1103,7 @@ class RandomHandler():
             bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
         else:
             chambersremaining = 5 - group.chamber
-            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""))
+            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1111,13 +1115,13 @@ class RandomHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.roulettekicks_enabled))
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.roulettekicks_enabled), reply_to_message_id=update.message.message_id)
             return
 
         group.roulettekicks_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Roulette kicks: {}".format(str(enabled)))
+        bot.send_message(chat_id=update.effective_chat.id, text="Roulette kicks: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
 
 class RuleHandler():
@@ -1137,7 +1141,7 @@ class RuleHandler():
         group = DB().get_group(update.message.chat.id)
         group.rules = None
         group.save()
-        bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.")
+        bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1152,7 +1156,7 @@ class RuleHandler():
         except IndexError:
             text = "You need to give the rules in the same message.\n\nExample:\n/setrules The only rule is that there are no rules. Except this one."
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text)
+        bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1170,7 +1174,7 @@ class RuleHandler():
             groupmember.save()
 
         if not group.rules:
-            bot.send_message(chat_id=update.effective_chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?")
+            bot.send_message(chat_id=update.effective_chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?", reply_to_message_id=update.message.message_id)
             return
 
         text = "{}\n\n".format(update.message.chat.title)
@@ -1282,7 +1286,7 @@ class ModerationHandler():
         groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
         if not warnings:
-            bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name))
+            bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name), reply_to_message_id=update.message.message_id)
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
@@ -1295,18 +1299,18 @@ class ModerationHandler():
 
             warningtext += "\n[{} UTC] warned by {} (reason: {})".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
-        bot.send_message(chat_id=update.effective_chat.id, text=warningtext)
+        bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
     @ensure_admin
     def warn(bot, update):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.")
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         if update.message.reply_to_message.from_user.id == bot.id:
-            bot.send_message(chat_id=update.message.chat.id, text=random.choice(["What did I even do!", "I'm just trying to help!", "Have you checked /auditlog to find the real culprit?", "I-I'm sorry..."]))
+            bot.send_message(chat_id=update.message.chat.id, text=random.choice(["What did I even do!", "I'm just trying to help!", "Have you checked /auditlog to find the real culprit?", "I-I'm sorry..."]), reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1332,14 +1336,14 @@ class ModerationHandler():
 
             warningtext += "\n[{} UTC] warned by {} (reason: {})".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
 
-        bot.send_message(chat_id=update.message.chat.id, text=warningtext)
+        bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
     @ensure_admin
     def clearwarnings(bot, update):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to clear the warnings of the person who wrote it.")
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to clear the warnings of the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1349,14 +1353,14 @@ class ModerationHandler():
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name))
+        bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
     @ensure_admin
     def kick(bot, update):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.")
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1374,14 +1378,14 @@ class ModerationHandler():
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name))
+        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
     @ensure_admin
     def ban(bot, update):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to ban the person who wrote it.")
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to ban the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1398,7 +1402,7 @@ class ModerationHandler():
         groupmember.save()
 
         bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        bot.send_message(chat_id=update.message.chat.id, text="I've banned {}.".format(message.from_user.name))
+        bot.send_message(chat_id=update.message.chat.id, text="I've banned {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @busy_indicator
@@ -1413,7 +1417,7 @@ class ModerationHandler():
     @requires_confirmation
     @run_async
     def call_mods(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name))
+        bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
 
 
 class SauceNaoHandler():
@@ -1427,12 +1431,12 @@ class SauceNaoHandler():
     @run_async
     def get_source(bot, update):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.")
+            bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
         if len(message.photo) == 0:
-            bot.send_message(chat_id=update.message.chat.id, text="I see no picture here.")
+            bot.send_message(chat_id=update.message.chat.id, text="I see no picture here.", reply_to_message_id=update.message.message_id)
             return
 
         picture = bot.get_file(file_id=message.photo[-1].file_id)
@@ -1441,17 +1445,17 @@ class SauceNaoHandler():
         request_url = 'https://saucenao.com/search.php?output_type=2&numres=1&api_key={}'.format(saucenao_token)
         r = requests.post(request_url, files={'file': ("image.png", picture_data.getvalue())})
         if r.status_code != 200:
-            bot.send_message(chat_id=update.message.chat.id, text="SauceNao failed me :( HTTP {}".format(r.status_code))
+            bot.send_message(chat_id=update.message.chat.id, text="SauceNao failed me :( HTTP {}".format(r.status_code), reply_to_message_id=update.message.message_id)
             return
 
         result_data = json.JSONDecoder(object_pairs_hook=OrderedDict).decode(r.text)
         if int(result_data['header']['results_returned']) == 0:
-            bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(")
+            bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(", reply_to_message_id=update.message.message_id)
             return
 
         results = sorted(result_data['results'], key=lambda result: float(result['header']['similarity']))
 
-        bot.send_message(chat_id=update.message.chat.id, text="I'm {}% sure this is the source: {}".format(results[-1]['header']['similarity'], results[-1]['data']['ext_urls'][0]))
+        bot.send_message(chat_id=update.message.chat.id, text="I'm {}% sure this is the source: {}".format(results[-1]['header']['similarity'], results[-1]['data']['ext_urls'][0]), reply_to_message_id=update.message.message_id)
 
 
 # Setup
