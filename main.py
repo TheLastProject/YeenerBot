@@ -695,7 +695,7 @@ class GreetingHandler():
         if group.welcome_message:
             text = group.welcome_message
         else:
-            text = "Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before they can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
+            text = "{% if not memberinfo.readrules %}Hello {{ user.name }} and welcome to {{ chat.title }}.{% if group.rules %}{% if group.forceruleread_enabled %} This group requires new members to read the rules before they can send messages.{% endif %} Please make sure to read the /rules by clicking the button below and pressing start.{% endif %}{% else %}Welcome back to {{ chat.title }}, {{ user.name }}!{% endif %}"
 
         keyboard = None
         if group.rules:
