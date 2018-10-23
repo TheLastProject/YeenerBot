@@ -884,7 +884,7 @@ class GroupStateHandler():
                     if chat.id == update.message.chat_id:
                         continue
 
-                    if not chat.get_member(update.message.from_user.id).status in ['creator', 'administrator', 'member']:
+                    if not chat.get_member(update.message.from_user.id).status in ['creator', 'administrator']:
                         continue
 
                     chats.append(chat)
@@ -903,13 +903,17 @@ class GroupStateHandler():
             for chat in chats:
                 keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchat {}'.format(update.message.chat.id, chat.id)))
             keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a control chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Set which chat as a control chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         group = DB().get_group(update.message.chat.id)
         if chat_id[0] == str(-1):
             group.controlchannel_id = None
         else:
+            if not bot.get_chat(chat_id[0]).get_member(update.message.from_user.id).status in ['creator', 'administrator']:
+                bot.send_message(chat_id=update.effective_chat.id, text="You need to be an admin in the chat you want to set as control chat.", reply_to_message_id=update.message.message_id)
+                return
+
             group.controlchannel_id = chat_id[0]
         group.save()
 
