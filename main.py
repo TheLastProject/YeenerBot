@@ -314,7 +314,7 @@ class Group():
         self.description = description
         self.rules = rules
         self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
-        self.bullet = bullet if bullet is not None else random.randint(0,5)
+        self.bullet = bullet if bullet is not None else random.randint(0,6)
         self.chamber = chamber if chamber is not None else 5
         self.auditlog = auditlog if auditlog is not None else json.dumps([])
         self.controlchannel_id = controlchannel_id
@@ -1085,7 +1085,7 @@ class RandomHandler():
         # Check if bullet is in chamber
         if group.bullet == group.chamber:
             bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *BOOM!* Your brain is now all over the wall behind you.</code>", reply_to_message_id=update.message.message_id)
-            group.bullet = random.randint(0,5)
+            group.bullet = random.randint(0,6)
             group.chamber = 5
             group.save()
             if not group.roulettekicks_enabled:
@@ -1101,10 +1101,16 @@ class RandomHandler():
             try:
                 bot.send_message(chat_id=update.message.from_user.id, text=Helpers.get_invite_link(bot, update.message.chat))
                 bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+                bot.send_message(chat_id=update.message.chat_id, text="{} is no longer among us.".format(update.message.from_user.name))
             except TelegramError:
                 return
 
             bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+        elif group.chamber == 5:
+            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click!* Oh, I forgot to load the gun...</code>", reply_to_message_id=update.message.message_id)
+            group.bullet = random.randint(0,5)
+            group.chamber = 5
+            group.save()
         else:
             chambersremaining = 5 - group.chamber
             bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""), reply_to_message_id=update.message.message_id)
