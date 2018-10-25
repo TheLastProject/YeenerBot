@@ -771,7 +771,7 @@ class GroupStateHandler():
                     continue
 
             message += "\n----\n".join(related_chats_text)
-            bot.send_message(chat_id=update.message.from_user.id, text=message, reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.message.from_user.id, text=message)
         else:
             bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
@@ -926,7 +926,7 @@ class GroupStateHandler():
         if not description:
             description = "No description"
 
-        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
 
     @staticmethod
     @busy_indicator
