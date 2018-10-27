@@ -331,7 +331,7 @@ class User():
     @staticmethod
     def get_types():
         return {'user_id': sqlalchemy.types.BigInteger,
-                'sudo_time': sqlalchemy.types.BigInteger}
+                'sudo_time': sqlalchemy.types.Float}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in User.get_keys()}
@@ -406,7 +406,7 @@ class GroupMember():
                 'user_id': sqlalchemy.types.BigInteger,
                 'readrules': sqlalchemy.types.Boolean,
                 'warnings': sqlalchemy.types.Text,
-                'lastcommandtime': sqlalchemy.types.BigInteger}
+                'lastcommandtime': sqlalchemy.types.Float}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in GroupMember.get_keys()}
