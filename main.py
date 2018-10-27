@@ -25,6 +25,7 @@ from math import ceil
 
 import dataset
 import requests
+import sqlalchemy
 
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
@@ -240,7 +241,7 @@ class DB():
 
     @staticmethod
     def update_group(group):
-        DB().__group_table.upsert(group.serialize(), ['group_id'])
+        DB().__group_table.upsert(group.serialize(), ['group_id'], types=Group.get_types())
 
     @staticmethod
     def migrate_group(group, new_id):
@@ -283,7 +284,7 @@ class DB():
 
     @staticmethod
     def update_user(user):
-        DB().__user_table.upsert(user.serialize(), ['user_id'])
+        DB().__user_table.upsert(user.serialize(), ['user_id'], types=User.get_types())
 
     @staticmethod
     def get_groupmember(group_id, user_id):
@@ -307,7 +308,7 @@ class DB():
 
     @staticmethod
     def update_groupmember(groupmember):
-        DB().__groupmember_table.upsert(groupmember.serialize(), ['group_id', 'user_id'])
+        DB().__groupmember_table.upsert(groupmember.serialize(), ['group_id', 'user_id'], types=GroupMember.get_types())
 
     @staticmethod
     def delete_groupmember(groupmember):
@@ -326,6 +327,11 @@ class User():
     @staticmethod
     def get_keys():
         return ['user_id', 'sudo_time']
+
+    @staticmethod
+    def get_types():
+        return {'user_id': sqlalchemy.types.BigInteger,
+                'sudo_time': sqlalchemy.types.BigInteger}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in User.get_keys()}
@@ -354,6 +360,22 @@ class Group():
     def get_keys():
         return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit']
 
+    @staticmethod
+    def get_types():
+        return {'group_id': sqlalchemy.types.BigInteger,
+                'welcome_enabled': sqlalchemy.types.Boolean,
+                'welcome_message': sqlalchemy.types.Text,
+                'forceruleread_enabled': sqlalchemy.types.Boolean,
+                'description': sqlalchemy.types.Text,
+                'rules': sqlalchemy.types.Text,
+                'relatedchat_ids': sqlalchemy.types.Text,
+                'bullet': sqlalchemy.types.Integer,
+                'chamber': sqlalchemy.types.Integer,
+                'auditlog': sqlalchemy.types.Text,
+                'controlchannel_id': sqlalchemy.types.BigInteger,
+                'roulettekicks_enabled': sqlalchemy.types.Boolean,
+                'commandratelimit': sqlalchemy.types.Integer}
+
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
 
@@ -377,6 +399,14 @@ class GroupMember():
     @staticmethod
     def get_keys():
         return ['group_id', 'user_id', 'readrules', 'warnings', 'lastcommandtime']
+
+    @staticmethod
+    def get_types():
+        return {'group_id': sqlalchemy.types.BigInteger,
+                'user_id': sqlalchemy.types.BigInteger,
+                'readrules': sqlalchemy.types.Boolean,
+                'warnings': sqlalchemy.types.Text,
+                'lastcommandtime': sqlalchemy.types.BigInteger}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in GroupMember.get_keys()}
