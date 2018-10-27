@@ -4,6 +4,15 @@ Telegram = XXXXXX
 # Optional, used for /source function. Create an account on https://saucenao.com/ for a key.
 #SauceNao = XXXXXX
 
+[DATABASE]
+# Type, either MySQL or PostgresQL. SQLite is not supported
+Type = MySQL
+#Username =
+#Password =
+Host = localhost
+Name = YeenerBot
+
+
 [GENERAL]
 # Optional, space-separated list of Telegram user IDs that are seen as "admins" in every chat the bot is in.
 # Get them from @userinfobot for example.

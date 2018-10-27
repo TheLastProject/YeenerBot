@@ -35,6 +35,31 @@ from telegram.ext.dispatcher import run_async
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
+# Config parsing
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+try:
+    superadmins = [int(superadmin) for superadmin in config.get('GENERAL', 'Superadmins', fallback="").split(" ")]
+except Exception:
+    print("No superadmins found or failed to parse the list. Continuing as normal.")
+    superadmins = []
+
+if not config.has_option('TOKENS', 'Telegram'):
+    print("No Telegram token set in config.ini. Cannot continue.")
+    exit(1)
+
+token = config['TOKENS']['Telegram']
+saucenao_token = config.get('TOKENS', 'SauceNao', fallback=None)
+
+db_type = config['DATABASE']['Type']
+db_host = config['DATABASE']['Host']
+db_username = config['DATABASE']['Username']
+db_password = config['DATABASE']['Password']
+db_name = config['DATABASE']['Name']
+
+
+
 def ratelimited(function):
     def wrapper(bot, update, **optional_args):
         if update.message.chat.type != 'private':
@@ -188,7 +213,7 @@ class SupportsFilter():
 
 
 class DB():
-    __db = dataset.connect('sqlite:///data.db')
+    __db = dataset.connect('{}://{}:{}@{}/{}'.format(db_type.lower(), db_username, db_password, db_host, db_name))
     __group_table = __db['group']
     __user_table = __db['user']
     __groupmember_table = __db['groupmember']
@@ -1469,22 +1494,6 @@ class SauceNaoHandler():
 
 
 # Setup
-config = configparser.ConfigParser()
-config.read('config.ini')
-
-try:
-    superadmins = [int(superadmin) for superadmin in config.get('GENERAL', 'Superadmins', fallback="").split(" ")]
-except Exception:
-    print("No superadmins found or failed to parse the list. Continuing as normal.")
-    superadmins = []
-
-if not config.has_option('TOKENS', 'Telegram'):
-    print("No Telegram token set in config.ini. Cannot continue.")
-    exit(1)
-
-token = config['TOKENS']['Telegram']
-saucenao_token = config.get('TOKENS', 'SauceNao', fallback=None)
-
 updater = Updater(token=token)
 dispatcher = updater.dispatcher
 
