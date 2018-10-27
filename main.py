@@ -309,6 +309,10 @@ class DB():
     def update_groupmember(groupmember):
         DB().__groupmember_table.upsert(groupmember.serialize(), ['group_id', 'user_id'])
 
+    @staticmethod
+    def delete_groupmember(groupmember):
+        DB().__groupmember_table.delete(groupmember.serialize(), ['group_id', 'user_id'])
+
 
 class MessageCache():
     messages = {}
