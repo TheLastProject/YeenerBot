@@ -502,6 +502,7 @@ class CallbackHandler():
         dispatcher.add_handler(message_handler, 99999) # Lowest possible priority
 
     @staticmethod
+    @run_async
     @busy_indicator
     def handle_callback(bot, update, update_queue):
         reply_to_message = update.callback_query.message.reply_to_message
@@ -574,6 +575,7 @@ class CallbackHandler():
             update.callback_query.answer(text='Sent {} to {}'.format(command, chats[0].title if chat_id != str(-1) else "all chats"))
 
     @staticmethod
+    @run_async
     def handle_message(bot, update):
         if update.update_id == -1:
             return
@@ -604,9 +606,9 @@ class DebugHandler():
         dispatcher.add_handler(ping_handler)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ratelimited
-    @run_async
     def ping(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Pong.",
@@ -621,6 +623,7 @@ class SudoHandler():
         dispatcher.add_handler(sudo_handler)
 
     @staticmethod
+    @run_async
     @busy_indicator
     def sudo(bot, update):
         if update.message.from_user.id not in superadmins:
@@ -655,6 +658,7 @@ class GreetingHandler():
         dispatcher.add_handler(toggleforceruleread_handler)
 
     @staticmethod
+    @run_async
     @busy_indicator
     def start(bot, update):
         try:
@@ -670,6 +674,7 @@ class GreetingHandler():
             RuleHandler.send_rules(bot, update)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -680,6 +685,7 @@ class GreetingHandler():
         bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -695,6 +701,7 @@ class GreetingHandler():
         bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -713,6 +720,7 @@ class GreetingHandler():
         bot.send_message(chat_id=update.effective_chat.id, text="Welcome: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -731,15 +739,18 @@ class GreetingHandler():
         bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), group.welcome_enabled, group.rules is not None), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     def created(bot, update):
         DB().get_group(update.message.chat.id)  # ensure creation
 
     @staticmethod
+    @run_async
     def migrated(bot, update):
         group = DB().get_group(update.message.migrate_from_chat_id)
         DB.migrate_group(group, update.message.migrate_to_chat_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     def welcome(bot, update):
         group = DB().get_group(update.message.chat.id)
@@ -801,6 +812,7 @@ class GroupStateHandler():
         dispatcher.add_handler(setcommandratelimit_handler)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     def relatedchats(bot, update):
@@ -835,6 +847,7 @@ class GroupStateHandler():
             bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -880,6 +893,7 @@ class GroupStateHandler():
         group.save()
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -913,6 +927,7 @@ class GroupStateHandler():
         group.save()
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -926,6 +941,7 @@ class GroupStateHandler():
         bot.send_message(chat_id=update.effective_chat.id, text=message, reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -977,6 +993,7 @@ class GroupStateHandler():
         group.save()
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     def description(bot, update):
@@ -988,6 +1005,7 @@ class GroupStateHandler():
         bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1005,9 +1023,9 @@ class GroupStateHandler():
         bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
-    @run_async
     def invitelink(bot, update):
         invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
@@ -1017,15 +1035,16 @@ class GroupStateHandler():
         bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    @run_async
     def revokeinvitelink(bot, update):
         bot.export_chat_invite_link(update.message.chat.id)
         bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1057,9 +1076,9 @@ class RandomHandler():
         dispatcher.add_handler(toggleroulettekicks_handler)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ratelimited
-    @run_async
     def roll(bot, update):
         try:
             roll = update.message.text.split(' ', 2)[1]
@@ -1090,9 +1109,9 @@ class RandomHandler():
         bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" + ".join([str(result) for result in results]), str(sum(results))), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ratelimited
-    @run_async
     def flip(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Heads.",
@@ -1101,9 +1120,9 @@ class RandomHandler():
         ], weights=[45,45,10])[0]), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ratelimited
-    @run_async
     def shake(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
             "It is certain.",
@@ -1129,6 +1148,7 @@ class RandomHandler():
         ])), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ratelimited
     def roulette(bot, update):
@@ -1175,6 +1195,7 @@ class RandomHandler():
             bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1203,6 +1224,7 @@ class RuleHandler():
         dispatcher.add_handler(setrules_handler)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1213,6 +1235,7 @@ class RuleHandler():
         bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1228,6 +1251,7 @@ class RuleHandler():
         bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     def send_rules(bot, update):
@@ -1310,6 +1334,7 @@ class ModerationHandler():
         dispatcher.add_handler(call_mods_handler2)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1344,6 +1369,7 @@ class ModerationHandler():
 
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     def warnings(bot, update):
@@ -1371,6 +1397,7 @@ class ModerationHandler():
         bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ensure_admin
     def warn(bot, update):
@@ -1408,6 +1435,7 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ensure_admin
     def clearwarnings(bot, update):
@@ -1425,6 +1453,7 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ensure_admin
     def kick(bot, update):
@@ -1450,6 +1479,7 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @ensure_admin
     def ban(bot, update):
@@ -1474,17 +1504,17 @@ class ModerationHandler():
         bot.send_message(chat_id=update.message.chat.id, text="I've banned {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @run_async
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    @run_async
     def say(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text=" ".join(update.message.text.split(' ')[1:]))
 
     @staticmethod
+    @run_async
     @busy_indicator
     @requires_confirmation
-    @run_async
     def call_mods(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
 
@@ -1496,8 +1526,8 @@ class SauceNaoHandler():
         dispatcher.add_handler(saucenao_handler)
 
     @staticmethod
-    @busy_indicator
     @run_async
+    @busy_indicator
     def get_source(bot, update):
         if not update.message.reply_to_message:
             bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.", reply_to_message_id=update.message.message_id)
