@@ -98,7 +98,7 @@ def ensure_admin(function):
                 return
 
             user = DB().get_user(update.message.from_user.id)
-            if time.time() - user.sudo_time > 30:
+            if time.time() - user.sudo_time > 300:
                 bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).", reply_to_message_id=update.message.message_id)
                 return
 
@@ -134,7 +134,7 @@ def resolve_chat(function):
         superadmin = False
         if user.id in superadmins:
             db_user = DB().get_user(update.message.from_user.id)
-            if time.time() - db_user.sudo_time <= 30:
+            if time.time() - db_user.sudo_time <= 300:
                 superadmin = True
 
         for group in DB.get_all_groups():
@@ -331,7 +331,7 @@ class User():
     @staticmethod
     def get_types():
         return {'user_id': sqlalchemy.types.BigInteger,
-                'sudo_time': sqlalchemy.types.Float}
+                'sudo_time': sqlalchemy.types.BigInteger}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in User.get_keys()}
@@ -635,7 +635,7 @@ class SudoHandler():
         user.sudo_time = time.time()
         user.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 30 seconds).", reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 300 seconds).", reply_to_message_id=update.message.message_id)
 
 
 class GreetingHandler():
