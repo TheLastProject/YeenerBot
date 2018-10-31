@@ -37,7 +37,7 @@ from telegram.ext.dispatcher import run_async
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-cache = TTLCache(maxsize=100, ttl=300)
+cache = TTLCache(maxsize=100, ttl=600)
 
 # Config parsing
 config = configparser.ConfigParser()
@@ -67,9 +67,9 @@ db_name = config['DATABASE']['Name']
 def ratelimited(function):
     def wrapper(bot, update, **optional_args):
         if update.message.chat.type != 'private':
-            group = DB().get_group(update.message.chat.id)
+            group = DB.get_group(update.message.chat.id)
             if group.commandratelimit:
-                group_member = DB().get_groupmember(update.message.chat.id, update.message.from_user.id)
+                group_member = DB.get_groupmember(update.message.chat.id, update.message.from_user.id)
                 timediff = time.time() - group_member.lastcommandtime
                 if timediff < group.commandratelimit:
                     member = update.message.chat.get_member(update.message.from_user.id)
@@ -100,14 +100,14 @@ def ensure_admin(function):
                 bot.send_message(chat_id=update.effective_chat.id, text="You do not have the required permission to do this.", reply_to_message_id=update.message.message_id)
                 return
 
-            user = DB().get_user(update.message.from_user.id)
+            user = DB.get_user(update.message.from_user.id)
             if time.time() - user.sudo_time > 300:
                 bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).", reply_to_message_id=update.message.message_id)
                 return
 
         command = update.message.text.split(' ', 1)[0]
         if not (command == '/auditlog' or command.startswith('/auditlog@')):
-            group = DB().get_group(update.message.chat.id)
+            group = DB.get_group(update.message.chat.id)
             auditlog = json.loads(group.auditlog)
             auditlog.append({'timestamp': time.time(), 'user': update.message.from_user.id, 'command': update.message.text, 'inreplyto': update.message.reply_to_message.from_user.id if update.message.reply_to_message else None})
             group.auditlog = json.dumps(auditlog)
@@ -136,7 +136,7 @@ def resolve_chat(function):
 
         superadmin = False
         if user.id in superadmins:
-            db_user = DB().get_user(update.message.from_user.id)
+            db_user = DB.get_user(update.message.from_user.id)
             if time.time() - db_user.sudo_time <= 300:
                 superadmin = True
 
@@ -224,7 +224,7 @@ class DB():
 
     @staticmethod
     def get_group(group_id):
-        group_data = DB().__group_table.find_one(group_id=group_id)
+        group_data = DB.__group_table.find_one(group_id=group_id)
         if not group_data:
             group = Group(group_id)
             group.save()
@@ -236,7 +236,7 @@ class DB():
     @staticmethod
     def get_all_groups():
         groups = []
-        for group_data in DB().__group_table.all():
+        for group_data in DB.__group_table.all():
             filtered_group_data = {_key: group_data[_key] for _key in Group.get_keys() if _key in group_data}
             groups.append(Group(**filtered_group_data))
 
@@ -244,7 +244,7 @@ class DB():
 
     @staticmethod
     def update_group(group):
-        DB().__group_table.upsert(group.serialize(), ['group_id'], types=Group.get_types())
+        DB.__group_table.upsert(group.serialize(), ['group_id'], types=Group.get_types())
 
     @staticmethod
     def migrate_group(group, new_id):
@@ -261,13 +261,13 @@ class DB():
 
     @staticmethod
     def delete_group(group):
-        DB().__group_table.delete(group_id=group.group_id)
+        DB.__group_table.delete(group_id=group.group_id)
         for groupmember in DB.get_all_groupmembers(group.group_id):
             DB.delete_groupmember(groupmember)
 
     @staticmethod
     def get_user(user_id):
-        user_data = DB().__user_table.find_one(user_id=user_id)
+        user_data = DB.__user_table.find_one(user_id=user_id)
         if not user_data:
             user = User(user_id)
             user.save()
@@ -279,7 +279,7 @@ class DB():
     @staticmethod
     def get_all_users():
         users = []
-        for user_data in DB().__user_table.all():
+        for user_data in DB.__user_table.all():
             filtered_user_data = {_key: user_data[_key] for _key in User.get_keys() if _key in user_data}
             users.append(User(**filtered_user_data))
 
@@ -287,11 +287,11 @@ class DB():
 
     @staticmethod
     def update_user(user):
-        DB().__user_table.upsert(user.serialize(), ['user_id'], types=User.get_types())
+        DB.__user_table.upsert(user.serialize(), ['user_id'], types=User.get_types())
 
     @staticmethod
     def get_groupmember(group_id, user_id):
-        groupmember_data = DB().__groupmember_table.find_one(group_id=group_id, user_id=user_id)
+        groupmember_data = DB.__groupmember_table.find_one(group_id=group_id, user_id=user_id)
         if not groupmember_data:
             groupmember = GroupMember(group_id, user_id)
             groupmember.save()
@@ -303,7 +303,7 @@ class DB():
     @staticmethod
     def get_all_groupmembers(group_id):
         groupmembers = []
-        for groupmember_data in DB().__groupmember_table.find(group_id=group_id):
+        for groupmember_data in DB.__groupmember_table.find(group_id=group_id):
             filtered_groupmember_data = {_key: groupmember_data[_key] for _key in GroupMember.get_keys() if _key in groupmember_data}
             groupmembers.append(GroupMember(**filtered_groupmember_data))
 
@@ -311,11 +311,11 @@ class DB():
 
     @staticmethod
     def update_groupmember(groupmember):
-        DB().__groupmember_table.upsert(groupmember.serialize(), ['group_id', 'user_id'], types=GroupMember.get_types())
+        DB.__groupmember_table.upsert(groupmember.serialize(), ['group_id', 'user_id'], types=GroupMember.get_types())
 
     @staticmethod
     def delete_groupmember(groupmember):
-        DB().__groupmember_table.delete(groupmember.serialize(), ['group_id', 'user_id'])
+        DB.__groupmember_table.delete(groupmember.serialize(), ['group_id', 'user_id'])
 
 
 class MessageCache():
@@ -641,7 +641,7 @@ class SudoHandler():
             print("{} ({}) tried to use sudo but was denied".format(update.message.from_user.name, update.message.from_user.id))
             return
 
-        user = DB().get_user(update.message.from_user.id)
+        user = DB.get_user(update.message.from_user.id)
         user.sudo_time = time.time()
         user.save()
 
@@ -689,7 +689,7 @@ class GreetingHandler():
     @resolve_chat
     @ensure_admin
     def clear_welcome(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         group.welcome_message = None
         group.save()
         bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.", reply_to_message_id=update.message.message_id)
@@ -700,7 +700,7 @@ class GreetingHandler():
     @resolve_chat
     @ensure_admin
     def set_welcome(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         text = "Welcome message set."
         try:
             group.welcome_message = update.message.text.split(' ', 1)[1]
@@ -716,7 +716,7 @@ class GreetingHandler():
     @resolve_chat
     @ensure_admin
     def toggle_welcome(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
@@ -735,7 +735,7 @@ class GreetingHandler():
     @resolve_chat
     @ensure_admin
     def toggle_forceruleread(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
@@ -751,19 +751,19 @@ class GreetingHandler():
     @staticmethod
     @run_async
     def created(bot, update):
-        DB().get_group(update.message.chat.id)  # ensure creation
+        DB.get_group(update.message.chat.id)  # ensure creation
 
     @staticmethod
     @run_async
     def migrated(bot, update):
-        group = DB().get_group(update.message.migrate_from_chat_id)
+        group = DB.get_group(update.message.migrate_from_chat_id)
         DB.migrate_group(group, update.message.migrate_to_chat_id)
 
     @staticmethod
     @run_async
     @busy_indicator
     def welcome(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         if not group.welcome_enabled:
             return
 
@@ -784,7 +784,7 @@ class GreetingHandler():
         env = ImmutableSandboxedEnvironment()
         for member in members:
             member = update.message.chat.get_member(member.id)
-            memberinfo = DB().get_groupmember(update.message.chat_id, member.user.id)
+            memberinfo = DB.get_groupmember(update.message.chat_id, member.user.id)
             try:
                 formatted_string = env.from_string(text).render({'member': member, 'user': member.user, 'group': group, 'memberinfo': memberinfo, 'chat': update.message.chat})
             except Exception as e:
@@ -826,14 +826,14 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     def relatedchats(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         relatedchats = Helpers.get_related_chats(bot, group)
         if relatedchats:
             message = "{}\n\nRelated chats:\n".format(update.message.chat.title)
             related_chats_text = []
             for relatedchat in relatedchats:
                 try:
-                    group = DB().get_group(relatedchat.id)
+                    group = DB.get_group(relatedchat.id)
                     try:
                         description = Helpers.get_description(bot, relatedchat, group)
                     except TelegramError:
@@ -893,7 +893,7 @@ class GroupStateHandler():
             bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a related chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         relatedchat_ids = json.loads(group.relatedchat_ids)
         for chat_id in chat_ids:
             if chat_id not in relatedchat_ids:
@@ -908,7 +908,7 @@ class GroupStateHandler():
     @resolve_chat
     @ensure_admin
     def remove_relatedchat(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         relatedchat_ids = json.loads(group.relatedchat_ids)
         chat_ids = update.message.text.split(' ', 1)[1:]
         if len(chat_ids) == 0:
@@ -942,7 +942,7 @@ class GroupStateHandler():
     @resolve_chat
     @ensure_admin
     def controlchat(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             message = "{}\n\nControl chat:\n{}".format(update.message.chat.title, CachedBot.get_chat(bot, group.controlchannel_id).title)
         else:
@@ -991,7 +991,7 @@ class GroupStateHandler():
             bot.send_message(chat_id=update.effective_chat.id, text="Set which chat as a control chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         if chat_id[0] == str(-1):
             group.controlchannel_id = None
         else:
@@ -1007,7 +1007,7 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     def description(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         description = Helpers.get_description(bot, update.message.chat, group)
         if not description:
             description = "No description"
@@ -1020,7 +1020,7 @@ class GroupStateHandler():
     @resolve_chat
     @ensure_admin
     def set_description(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         text = "Description set."
         try:
             group.description = update.message.text.split(' ', 1)[1]
@@ -1059,7 +1059,7 @@ class GroupStateHandler():
     @resolve_chat
     @ensure_admin
     def set_commandratelimit(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         text = "Member can now only execute one fun command per {} seconds."
         try:
             group.commandratelimit = int(update.message.text.split(' ', 1)[1])
@@ -1162,7 +1162,7 @@ class RandomHandler():
     @busy_indicator
     @ratelimited
     def roulette(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
 
         # Go to next chamber
         if group.chamber == 5:
@@ -1210,7 +1210,7 @@ class RandomHandler():
     @resolve_chat
     @ensure_admin
     def toggle_roulettekicks(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
@@ -1239,7 +1239,7 @@ class RuleHandler():
     @resolve_chat
     @ensure_admin
     def clear_rules(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         group.rules = None
         group.save()
         bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.", reply_to_message_id=update.message.message_id)
@@ -1250,7 +1250,7 @@ class RuleHandler():
     @resolve_chat
     @ensure_admin
     def set_rules(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         text = "Rules set."
         try:
             group.rules = update.message.text.split(' ', 1)[1]
@@ -1265,8 +1265,8 @@ class RuleHandler():
     @busy_indicator
     @resolve_chat
     def send_rules(bot, update):
-        group = DB().get_group(update.message.chat.id)
-        groupmember = DB().get_groupmember(update.message.chat_id, update.message.from_user.id)
+        group = DB.get_group(update.message.chat.id)
+        groupmember = DB.get_groupmember(update.message.chat_id, update.message.from_user.id)
 
         if not groupmember.readrules:
             member = update.message.chat.get_member(update.message.from_user.id)
@@ -1294,7 +1294,7 @@ class RuleHandler():
             related_chats_text = []
             for relatedchat in relatedchats:
                 try:
-                    group = DB().get_group(relatedchat.id)
+                    group = DB.get_group(relatedchat.id)
 
                     try:
                         description = Helpers.get_description(bot, relatedchat, group)
@@ -1349,7 +1349,7 @@ class ModerationHandler():
     @resolve_chat
     @ensure_admin
     def auditlog(bot, update):
-        group = DB().get_group(update.message.chat.id)
+        group = DB.get_group(update.message.chat.id)
         auditlog = json.loads(group.auditlog)
         if len(auditlog) == 0:
             bot.send_message(chat_id=update.message.from_user.id, text="No admin actions have been logged in this chat yet.")
@@ -1388,7 +1388,7 @@ class ModerationHandler():
         else:
             message = update.message
 
-        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
         if not warnings:
             bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name), reply_to_message_id=update.message.message_id)
@@ -1420,7 +1420,7 @@ class ModerationHandler():
             return
 
         message = update.message.reply_to_message
-        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
 
         try:
@@ -1454,7 +1454,7 @@ class ModerationHandler():
             return
 
         message = update.message.reply_to_message
-        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
         warnings = []
         groupmember.warnings = json.dumps(warnings)
@@ -1472,7 +1472,7 @@ class ModerationHandler():
             return
 
         message = update.message.reply_to_message
-        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
 
         try:
@@ -1498,7 +1498,7 @@ class ModerationHandler():
             return
 
         message = update.message.reply_to_message
-        groupmember = DB().get_groupmember(update.message.chat.id, message.from_user.id)
+        groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
 
         try:
