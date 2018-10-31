@@ -27,6 +27,7 @@ import dataset
 import requests
 import sqlalchemy
 
+from cachetools import cached, TTLCache
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import Unauthorized, TelegramError
@@ -35,6 +36,8 @@ from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
+
+cache = TTLCache(maxsize=100, ttl=300)
 
 # Config parsing
 config = configparser.ConfigParser()
@@ -142,7 +145,7 @@ def resolve_chat(function):
                 if is_control_channel and group.controlchannel_id != str(update.message.chat.id):
                     continue
 
-                chat = bot.get_chat(group.group_id)
+                chat = CachedBot.get_chat(bot, group.group_id)
 
                 if chat.type == 'private':
                     DB.delete_group(group)
@@ -438,6 +441,13 @@ class ErrorHandler():
             bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
 
+class CachedBot():
+    @staticmethod
+    @cached(cache)
+    def get_chat(bot, chat_id):
+        return bot.get_chat(chat_id)
+
+
 class Helpers():
     @staticmethod
     def get_creator(chat):
@@ -468,7 +478,7 @@ class Helpers():
 
     @staticmethod
     def get_description(bot, chat, group):
-        return group.description if group.description else bot.get_chat(chat.id).description
+        return group.description if group.description else CachedBot.get_chat(bot, chat.id).description
 
     @staticmethod
     def get_invite_link(bot, chat):
@@ -483,7 +493,7 @@ class Helpers():
         relatedchat_ids = json.loads(group.relatedchat_ids)
         for relatedchat_id in relatedchat_ids[:]:
             try:
-                chats.append(bot.get_chat(relatedchat_id))
+                chats.append(CachedBot.get_chat(bot, relatedchat_id))
             except TelegramError:
                 # Bugged chat? Remove right here
                 relatedchat_ids.remove(relatedchat_id)
@@ -539,7 +549,7 @@ class CallbackHandler():
                     if is_control_channel and group.controlchannel_id != str(update.callback_query.message.chat.id):
                         continue
 
-                    chat = bot.get_chat(group.group_id)
+                    chat = CachedBot.get_chat(bot, group.group_id)
 
                     if chat.type == 'private':
                         DB.delete_group(group)
@@ -561,7 +571,7 @@ class CallbackHandler():
 
                     continue
         else:
-            chats = [bot.get_chat(chat_id)]
+            chats = [CachedBot.get_chat(bot, chat_id)]
 
         for chat in chats:
             message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=bot, reply_to_message=reply_to_message)
@@ -668,7 +678,7 @@ class GreetingHandler():
 
         if payload.startswith('rules_'):
             chat_id = payload[len('rules_'):]
-            chat = bot.get_chat(chat_id)
+            chat = CachedBot.get_chat(bot, chat_id)
             # Could be cleaner
             update.message.chat = chat
             RuleHandler.send_rules(bot, update)
@@ -857,7 +867,7 @@ class GroupStateHandler():
             chats = []
             for group in DB.get_all_groups():
                 try:
-                    chat = bot.get_chat(group.group_id)
+                    chat = CachedBot.get_chat(bot, group.group_id)
                     if chat.type == 'private':
                         DB.delete_group(group)
                         continue
@@ -905,7 +915,7 @@ class GroupStateHandler():
             chats = []
             for chat_id in relatedchat_ids:
                 try:
-                    chat = bot.get_chat(chat_id)
+                    chat = CachedBot.get_chat(bot, chat_id)
                     chats.append(chat)
                 except TelegramError:
                     continue
@@ -934,7 +944,7 @@ class GroupStateHandler():
     def controlchat(bot, update):
         group = DB().get_group(update.message.chat.id)
         if group.controlchannel_id:
-            message = "{}\n\nControl chat:\n{}".format(update.message.chat.title, bot.get_chat(group.controlchannel_id).title)
+            message = "{}\n\nControl chat:\n{}".format(update.message.chat.title, CachedBot.get_chat(bot, group.controlchannel_id).title)
         else:
             message = "{}\n\nNo known control chat".format(update.message.chat.title)
 
@@ -951,7 +961,7 @@ class GroupStateHandler():
             chats = []
             for group in DB.get_all_groups():
                 try:
-                    chat = bot.get_chat(group.group_id)
+                    chat = CachedBot.get_chat(bot, group.group_id)
                     if chat.type == 'private':
                         DB.delete_group(group)
                         continue
@@ -985,7 +995,7 @@ class GroupStateHandler():
         if chat_id[0] == str(-1):
             group.controlchannel_id = None
         else:
-            if not bot.get_chat(chat_id[0]).get_member(update.message.from_user.id).status in ['creator', 'administrator']:
+            if not CachedBot.get_chat(bot, chat_id[0]).get_member(update.message.from_user.id).status in ['creator', 'administrator']:
                 bot.send_message(chat_id=update.effective_chat.id, text="You need to be an admin in the chat you want to set as control chat.", reply_to_message_id=update.message.message_id)
                 return
 
