@@ -63,8 +63,15 @@ db_password = config['DATABASE']['Password']
 db_name = config['DATABASE']['Name']
 
 
+def catch_errors(function):
+    def wrapper(bot, update, **optional_args):
+        try:
+            return function(bot=bot, update=update, **optional_args)
+        except TelegramError as error:
+            return ErrorHandler.handle_error(bot=bot, update=update, error=error)
+    return wrapper
 
-def ratelimited(function):
+def rate_limited(function):
     def wrapper(bot, update, **optional_args):
         if update.message.chat.type != 'private':
             group = DB.get_group(update.message.chat.id)
@@ -430,8 +437,7 @@ class ErrorHandler():
         return message
 
     @staticmethod
-    @run_async
-    def handle_error(self, bot, update, error):
+    def handle_error(bot, update, error):
         if not update:
             return
 
@@ -515,6 +521,7 @@ class CallbackHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     def handle_callback(bot, update, update_queue):
         reply_to_message = update.callback_query.message.reply_to_message
@@ -619,8 +626,9 @@ class DebugHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
-    @ratelimited
+    @rate_limited
     def ping(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Pong.",
@@ -636,6 +644,7 @@ class SudoHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     def sudo(bot, update):
         if update.message.from_user.id not in superadmins:
@@ -671,6 +680,7 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     def start(bot, update):
         try:
@@ -687,6 +697,7 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -698,6 +709,7 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -714,6 +726,7 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -733,6 +746,7 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -763,6 +777,7 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     def welcome(bot, update):
         group = DB.get_group(update.message.chat.id)
@@ -825,6 +840,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     def relatedchats(bot, update):
@@ -860,6 +876,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -906,6 +923,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -940,6 +958,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -954,6 +973,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1006,6 +1026,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     def description(bot, update):
@@ -1018,6 +1039,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1036,6 +1058,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     def invitelink(bot, update):
@@ -1048,6 +1071,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1057,6 +1081,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1089,8 +1114,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
-    @ratelimited
+    @rate_limited
     def roll(bot, update):
         try:
             roll = update.message.text.split(' ', 2)[1]
@@ -1122,8 +1148,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
-    @ratelimited
+    @rate_limited
     def flip(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Heads.",
@@ -1133,8 +1160,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
-    @ratelimited
+    @rate_limited
     def shake(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
             "It is certain.",
@@ -1161,8 +1189,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
-    @ratelimited
+    @rate_limited
     def roulette(bot, update):
         group = DB.get_group(update.message.chat.id)
 
@@ -1208,6 +1237,7 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1237,6 +1267,7 @@ class RuleHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1248,6 +1279,7 @@ class RuleHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1264,6 +1296,7 @@ class RuleHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     def send_rules(bot, update):
@@ -1347,6 +1380,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1382,6 +1416,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     def warnings(bot, update):
@@ -1410,6 +1445,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @ensure_admin
     def warn(bot, update):
@@ -1448,6 +1484,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @ensure_admin
     def clearwarnings(bot, update):
@@ -1466,6 +1503,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @ensure_admin
     def kick(bot, update):
@@ -1492,6 +1530,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @ensure_admin
     def ban(bot, update):
@@ -1517,6 +1556,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @resolve_chat
     @ensure_admin
@@ -1525,6 +1565,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     @requires_confirmation
     def call_mods(bot, update):
@@ -1539,6 +1580,7 @@ class SauceNaoHandler():
 
     @staticmethod
     @run_async
+    @catch_errors
     @busy_indicator
     def get_source(bot, update):
         if not update.message.reply_to_message:
