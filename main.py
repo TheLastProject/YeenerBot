@@ -420,7 +420,7 @@ class GroupMember():
 
 class ErrorHandler():
     def __init__(self, dispatcher):
-        dispatcher.add_error_handler(self.handle_error)
+        dispatcher.add_error_handler(ErrorHandler.handle_error)
 
     @staticmethod
     def filter_tokens(message):
@@ -429,6 +429,8 @@ class ErrorHandler():
             message = re.sub(regex, "[censored]", message)
         return message
 
+    @staticmethod
+    @run_async
     def handle_error(self, bot, update, error):
         if not update:
             return
