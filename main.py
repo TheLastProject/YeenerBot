@@ -315,7 +315,7 @@ class DB():
 
     @staticmethod
     def delete_groupmember(groupmember):
-        DB.__groupmember_table.delete(groupmember.serialize(), ['group_id', 'user_id'])
+        DB.__groupmember_table.delete(group_id=groupmember.group_id, user_id=groupmember.user_id)
 
 
 class MessageCache():
