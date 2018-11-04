@@ -13,10 +13,10 @@ import datetime
 import io
 import json
 import logging
-import os
-import time
 import random
 import re
+import time
+import traceback
 
 from collections import OrderedDict
 from copy import deepcopy
@@ -69,6 +69,9 @@ def catch_errors(function):
             return function(bot=bot, update=update, **optional_args)
         except TelegramError as error:
             return ErrorHandler.handle_error(bot=bot, update=update, error=error)
+        except Exception:
+            traceback.print_exc()
+            return ErrorHandler.handle_error(bot=bot, update=update, error="Something went wrong")
     return wrapper
 
 def rate_limited(function):
@@ -224,7 +227,7 @@ class SupportsFilter():
 
 
 class DB():
-    __db = dataset.connect('{}://{}:{}@{}/{}'.format(db_type.lower(), db_username, db_password, db_host, db_name))
+    __db = dataset.connect('{}://{}:{}@{}/{}'.format(db_type.lower(), db_username, db_password, db_host, db_name), engine_kwargs={'pool_pre_ping': True})
     __group_table = __db['group']
     __user_table = __db['user']
     __groupmember_table = __db['groupmember']
