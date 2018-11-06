@@ -69,7 +69,8 @@ def catch_errors(function):
             return function(bot=bot, update=update, **optional_args)
         except TelegramError as error:
             return ErrorHandler.handle_error(bot=bot, update=update, error=error)
-        except Exception:
+        except Exception as e:
+            print(e)
             traceback.print_exc()
             return ErrorHandler.handle_error(bot=bot, update=update, error="Something went wrong")
     return wrapper
@@ -449,9 +450,11 @@ class ErrorHandler():
         if type(error) == Unauthorized and update.message:
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
             bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
-        else:
-            text = "An error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
+        elif type(error) == TelegramError:
+            text = "A Telegram error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
             bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
+        else:
+            bot.send_message("My programmer messed up and I ran into a bug :(")
 
 
 class CachedBot():
@@ -741,7 +744,7 @@ class GreetingHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(group.welcome_enabled))), reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.welcome_enabled)))), reply_to_message_id=update.message.message_id)
             return
 
         group.welcome_enabled = enabled
@@ -761,7 +764,7 @@ class GreetingHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(group.forceruleread_enabled))), reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.forceruleread_enabled)))), reply_to_message_id=update.message.message_id)
             return
 
         group.forceruleread_enabled = enabled
@@ -1259,7 +1262,7 @@ class RandomHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(group.roulettekicks_enabled))), reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.roulettekicks_enabled)))), reply_to_message_id=update.message.message_id)
             return
 
         group.roulettekicks_enabled = enabled
