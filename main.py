@@ -444,12 +444,14 @@ class ErrorHandler():
         if not update:
             return
 
-        if type(error) == Unauthorized:
+        reply_to_message = update.message.message_id if update.message else None
+
+        if type(error) == Unauthorized and update.message:
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
-            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
         else:
             text = "An error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
-            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
 
 
 class CachedBot():
