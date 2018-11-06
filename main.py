@@ -739,7 +739,7 @@ class GreetingHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.welcome_enabled), reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(group.welcome_enabled))), reply_to_message_id=update.message.message_id)
             return
 
         group.welcome_enabled = enabled
@@ -759,7 +759,7 @@ class GreetingHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.forceruleread_enabled), reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(group.forceruleread_enabled))), reply_to_message_id=update.message.message_id)
             return
 
         group.forceruleread_enabled = enabled
@@ -1220,13 +1220,20 @@ class RandomHandler():
             for admin in update.message.chat.get_administrators():
                 if admin.user.id == update.message.from_user.id:
                     return
-            
+
             try:
                 bot.send_message(chat_id=update.message.from_user.id, text=Helpers.get_invite_link(bot, update.message.chat))
-                bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
-                bot.send_message(chat_id=update.message.chat_id, text="{} is no longer among us.".format(update.message.from_user.name))
-            except TelegramError:
+            except Unauthorized:
+                bot.send_message(chat_id=update.message.chat_id, text="{} doesn't let me PM them an invite link back in, so I won't kick. Boring!".format(update.message.from_user.name))
                 return
+
+            try:
+                bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+            except Unauthorized:
+                bot.send_message(chat_id=update.message.chat_id, text="Roulette kicking is enabled, but I don't have the rights to kick...")
+                return
+
+            bot.send_message(chat_id=update.message.chat_id, text="{} is no longer among us.".format(update.message.from_user.name))
 
             bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
         elif group.chamber == 5:
@@ -1250,7 +1257,7 @@ class RandomHandler():
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(group.roulettekicks_enabled), reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(group.roulettekicks_enabled))), reply_to_message_id=update.message.message_id)
             return
 
         group.roulettekicks_enabled = enabled
