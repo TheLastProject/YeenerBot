@@ -1196,7 +1196,6 @@ class RandomHandler():
         ])), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @catch_errors
     @busy_indicator
     @rate_limited
