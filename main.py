@@ -454,7 +454,7 @@ class ErrorHandler():
             text = "A Telegram error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
             bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
         else:
-            bot.send_message(chat_id=update.effective_chat.id, text="My programmer messed up and I ran into a bug :(")
+            bot.send_message(chat_id=update.effective_chat.id, text="I ran into an unexpected issue :(", reply_to_message_id=reply_to_message)
 
 
 class CachedBot():
