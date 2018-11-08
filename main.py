@@ -88,7 +88,7 @@ def rate_limited(function):
                         bot.send_message(chat_id=update.effective_chat.id, text="You're too spammy. Try again in {} seconds".format(ceil(group.commandratelimit - timediff)), reply_to_message_id=update.message.message_id)
                         return
 
-                group_member.lastcommandtime = time.time()
+                group_member.lastcommandtime = ceil(time.time())
                 group_member.save()
 
         return function(bot=bot, update=update, **optional_args)
@@ -420,7 +420,7 @@ class GroupMember():
                 'user_id': sqlalchemy.types.BigInteger,
                 'readrules': sqlalchemy.types.Boolean,
                 'warnings': sqlalchemy.types.Text,
-                'lastcommandtime': sqlalchemy.types.Float}
+                'lastcommandtime': sqlalchemy.types.Integer}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in GroupMember.get_keys()}
