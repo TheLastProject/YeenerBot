@@ -1139,18 +1139,19 @@ class RandomHandler():
 
         for section in sections:
             diceparts = section.split('d')
-            if len(diceparts) == 0:
-                count = 1
-                faces = 20
-            elif len(diceparts) == 1:
-                try:
-                    value = int(diceparts[0])
-                except ValueError:
-                    results.append({'description': '{} (invalid)'.format(diceparts[0]), 'values': [], 'total': 0})
-                    continue
+            if len(diceparts) == 1:
+                if empty(diceparts[0]):
+                    count = 1
+                    faces = 20
+                else:
+                    try:
+                        value = int(diceparts[0])
+                    except ValueError:
+                        results.append({'description': '{} (invalid)'.format(diceparts[0]), 'values': [], 'total': 0})
+                        continue
 
-                results.append({'description': str(value), 'values': [value], 'total': value})
-                continue
+                    results.append({'description': str(value), 'values': [value], 'total': value})
+                    continue
             else:
                 try:
                     count = int(diceparts[0])
