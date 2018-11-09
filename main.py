@@ -1140,7 +1140,7 @@ class RandomHandler():
         for section in sections:
             diceparts = section.split('d')
             if len(diceparts) == 1:
-                if empty(diceparts[0]):
+                if diceparts[0].strip() == "":
                     count = 1
                     faces = 20
                 else:
