@@ -1131,7 +1131,7 @@ class RandomHandler():
         try:
             roll = update.message.text.split(' ', 2)[1]
         except IndexError:
-            roll = '1d6'
+            roll = '1d20'
 
         sections = roll.split('+')
         if len(sections) > 9:
@@ -1181,7 +1181,7 @@ class RandomHandler():
             text += "[{}]\n".format(result['description'])
             if len(result['values']) > 1:
                 text += ", ".join([str(value) for value in result['values']])
-                text += " = ".join(result['total'])
+                text += " = {}".format(str(result['total']))
             else:
                 text += str(result['total'])
 
