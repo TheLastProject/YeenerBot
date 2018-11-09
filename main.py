@@ -1133,6 +1133,9 @@ class RandomHandler():
         except IndexError:
             roll = '1d20'
 
+        if not 'd' in roll and not '+' in roll:
+            roll = '1d20'
+
         sections = roll.split('+')
         if len(sections) > 9:
             bot.send_message(chat_id=update.message.chat_id, text="Please simplify your roll a bit", reply_to_message_id=update.message.message_id)
