@@ -1139,7 +1139,10 @@ class RandomHandler():
 
         for section in sections:
             diceparts = section.split('d')
-            if len(diceparts) == 1:
+            if len(diceparts) == 0:
+                count = 1
+                faces = 20
+            elif len(diceparts) == 1:
                 try:
                     value = int(diceparts[0])
                 except ValueError:
@@ -1148,16 +1151,16 @@ class RandomHandler():
 
                 results.append({'description': str(value), 'values': [value], 'total': value})
                 continue
+            else:
+                try:
+                    count = int(diceparts[0])
+                except ValueError:
+                    count = 1
 
-            try:
-                count = int(diceparts[0])
-            except ValueError:
-                count = 1
-
-            try:
-                faces = int(diceparts[1])
-            except ValueError:
-                faces = 6
+                try:
+                    faces = int(diceparts[1])
+                except ValueError:
+                    faces = 20
 
             dice = '{}d{}'.format(count, faces)
 
