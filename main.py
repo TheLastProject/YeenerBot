@@ -1183,7 +1183,7 @@ class RandomHandler():
                 text += ", ".join(result['values'])
                 text += " = ".join(result['total'])
             else:
-                text += result['total']
+                text += str(result['total'])
 
             total_total += total
 
