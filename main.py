@@ -1179,7 +1179,7 @@ class RandomHandler():
         text = ""
         for result in results:
             text += "[{}]\n".format(result['description'])
-            if len(result['values'] > 1):
+            if len(result['values']) > 1:
                 text += ", ".join(result['values'])
                 text += " = ".join(result['total'])
             else:
