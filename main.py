@@ -1138,7 +1138,8 @@ class RandomHandler():
 
         sections = roll.split('+')
         if len(sections) > 9:
-            bot.send_message(chat_id=update.message.chat_id, text="Please simplify your roll a bit", reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.message.chat_id, text="Slow your roll", reply_to_message_id=update.message.message_id)
+            return
 
         for section in sections:
             diceparts = section.split('d')
@@ -1170,8 +1171,10 @@ class RandomHandler():
 
             if count < 1 or faces < 1:
                 results.append({'description': '{} (invalid)'.format(dice), 'values': [], 'total': 0})
+                continue
             elif count > 99 or faces > 99:
                 results.append({'description': '{} (too big)'.format(dice), 'values': [], 'total': 0})
+                continue
 
             values = []
             total = 0
