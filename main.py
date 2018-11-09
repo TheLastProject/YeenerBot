@@ -1180,7 +1180,7 @@ class RandomHandler():
         for result in results:
             text += "[{}]\n".format(result['description'])
             if len(result['values']) > 1:
-                text += ", ".join(result['values'])
+                text += ", ".join([str(value) for value in result['values']])
                 text += " = ".join(result['total'])
             else:
                 text += str(result['total'])
