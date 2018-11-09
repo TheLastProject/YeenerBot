@@ -1126,33 +1126,71 @@ class RandomHandler():
     @busy_indicator
     @rate_limited
     def roll(bot, update):
+        results = []
+
         try:
             roll = update.message.text.split(' ', 2)[1]
-            dice = [int(n) for n in roll.split('d', 1)]
-        except (IndexError, ValueError):
-            dice = [1, 20]
+        except IndexError:
+            roll = '1d6'
 
-        if dice[0] < 1 or dice[1] < 1:
-            bot.send_message(chat_id=update.message.chat_id, text="Very funny.", reply_to_message_id=update.message.message_id)
-            return
+        sections = roll.split('+')
+        if len(sections) > 9:
+            bot.send_message(chat_id=update.message.chat_id, text="Please simplify your roll a bit", reply_to_message_id=update.message.message_id)
 
-        if dice[1] == 1:
-            bot.send_message(chat_id=update.message.chat_id, text="I'm here to roll dice, not calculate 1+1...", reply_to_message_id=update.message.message_id)
-            return
+        for section in sections:
+            diceparts = section.split('d')
+            if len(diceparts) == 1:
+                try:
+                    value = int(diceparts[0])
+                except ValueError:
+                    results.append({'description': '{} (invalid)'.format(diceparts[0]), 'values': [], 'total': 0})
+                    continue
 
-        if dice[0] > 100 or dice[1] > 100:
-            bot.send_message(chat_id=update.message.chat_id, text="Sorry, but I'm limited to 100d100.", reply_to_message_id=update.message.message_id)
-            return
+                results.append({'description': str(value), 'values': [value], 'total': value})
+                continue
 
-        if dice[0] == 1:
-            bot.send_message(chat_id=update.message.chat_id, text=str(random.randint(1, dice[1])), reply_to_message_id=update.message.message_id)
-            return
+            try:
+                count = int(diceparts[0])
+            except ValueError:
+                count = 1
 
-        results = []
-        for i in range(0, dice[0]):
-            results.append(random.randint(1, dice[1]))
+            try:
+                faces = int(diceparts[1])
+            except ValueError:
+                faces = 6
 
-        bot.send_message(chat_id=update.message.chat_id, text="{} = {}".format(" + ".join([str(result) for result in results]), str(sum(results))), reply_to_message_id=update.message.message_id)
+            dice = '{}d{}'.format(count, faces)
+
+            if count < 1 or faces < 1:
+                results.append({'description': '{} (invalid)'.format(dice), 'values': [], 'total': 0})
+            elif count > 99 or faces > 99:
+                results.append({'description': '{} (too big)'.format(dice), 'values': [], 'total': 0})
+
+            values = []
+            total = 0
+            for _ in range(1, count):
+                roll_result = random.randint(1, faces)
+                values.append(roll_result)
+                total += roll_result
+
+            results.append({'description': '{}d{}'.format(count, faces), 'values': values, 'total': total})
+
+        total_total = 0
+        text = ""
+        for result in results:
+            text += "[{}]\n".format(result['description'])
+            if len(result['values'] > 1):
+                text += ", ".join(result['values'])
+                text += " = ".join(result['total'])
+            else:
+                text += result['total']
+
+            total_total += total
+
+        if len(results) > 1:
+            text += "\n[total]\n{}".format(total_total)
+
+        bot.send_message(chat_id=update.message.chat_id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
