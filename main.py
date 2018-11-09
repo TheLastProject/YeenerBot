@@ -1168,7 +1168,7 @@ class RandomHandler():
 
             values = []
             total = 0
-            for _ in range(1, count):
+            for _ in range(0, count):
                 roll_result = random.randint(1, faces)
                 values.append(roll_result)
                 total += roll_result
@@ -1185,12 +1185,13 @@ class RandomHandler():
             else:
                 text += str(result['total'])
 
+            text += "\n\n"
             total_total += total
 
         if len(results) > 1:
-            text += "\n[total]\n{}".format(total_total)
+            text += "[total]\n{}".format(total_total)
 
-        bot.send_message(chat_id=update.message.chat_id, text=text, reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat_id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
