@@ -1186,7 +1186,7 @@ class RandomHandler():
                 text += str(result['total'])
 
             text += "\n\n"
-            total_total += total
+            total_total += result['total']
 
         if len(results) > 1:
             text += "[total]\n{}".format(total_total)
