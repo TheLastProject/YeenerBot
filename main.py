@@ -1133,7 +1133,7 @@ class RandomHandler():
         except IndexError:
             roll = '1d20'
 
-        if 'd' not in roll and '+' not in roll:
+        if 'd' not in roll and '+' not in roll and '-' not in roll:
             roll = '1d20'
 
         # Prefix every - with a + so we can do /roll 1d20-4
