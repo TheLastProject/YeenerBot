@@ -1137,7 +1137,7 @@ class RandomHandler():
             roll = '1d20'
 
         # Prefix every - with a + so we can do /roll 1d20-4
-        roll = re.sub(r'[^+]-', '+-', roll)
+        roll = re.sub(r'(?<![+])-', '+-', roll)
         sections = roll.split('+')
         if len(sections) > 9:
             bot.send_message(chat_id=update.message.chat_id, text="Slow your roll", reply_to_message_id=update.message.message_id)
