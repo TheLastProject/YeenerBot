@@ -1434,7 +1434,7 @@ class ModerationHandler():
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
         togglemutegroup_handler = CommandHandler('togglemutegroup', ModerationHandler.toggle_mutegroup)
-        message_handler = MessageHandler(Filters.chat(chat_id=global_mutedgroups), ModerationHandler.handle_message)
+        message_handler = MessageHandler(Filters.all & (~Filters.private), ModerationHandler.handle_message)
         dispatcher.add_handler(auditlog_handler)
         dispatcher.add_handler(warnings_handler)
         dispatcher.add_handler(warn_handler)
@@ -1665,6 +1665,9 @@ class ModerationHandler():
     @staticmethod
     @run_async
     def handle_message(bot, update):
+        if update.message.chat.id not in global_mutedgroups:
+            return
+
         chat = CachedBot.get_chat(bot, update.message.chat.id)
         if chat.get_member(update.message.user.id).status not in ['creator', 'administrator']:
             update.message.delete()
