@@ -31,7 +31,7 @@ from cachetools import cached, TTLCache
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import Unauthorized, TelegramError
-from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
+from telegram.ext import CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
 from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -524,7 +524,7 @@ class CallbackHandler():
     def __init__(self, dispatcher):
         callback_handler = CallbackQueryHandler(CallbackHandler.handle_callback, pass_update_queue=True)
         message_handler = MessageHandler(Filters.private, CallbackHandler.handle_message)
-        dispatcher.add_handler(callback_handler)
+        dispatcher.add_handler(callback_handler, group=1)
         dispatcher.add_handler(message_handler, 99999) # Lowest possible priority
 
     @staticmethod
@@ -630,7 +630,7 @@ class CallbackHandler():
 class DebugHandler():
     def __init__(self, dispatcher):
         ping_handler = CommandHandler('ping', DebugHandler.ping)
-        dispatcher.add_handler(ping_handler)
+        dispatcher.add_handler(ping_handler, group=1)
 
     @staticmethod
     @run_async
@@ -648,7 +648,7 @@ class DebugHandler():
 class SudoHandler():
     def __init__(self, dispatcher):
         sudo_handler = CommandHandler('sudo', SudoHandler.sudo)
-        dispatcher.add_handler(sudo_handler)
+        dispatcher.add_handler(sudo_handler, group=1)
 
     @staticmethod
     @run_async
@@ -677,14 +677,14 @@ class GreetingHandler():
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
         togglewelcome_handler = CommandHandler('togglewelcome', GreetingHandler.toggle_welcome)
         toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
-        dispatcher.add_handler(start_handler)
-        dispatcher.add_handler(created_handler)
-        dispatcher.add_handler(migrated_handler)
-        dispatcher.add_handler(welcome_handler)
-        dispatcher.add_handler(clearwelcome_handler)
-        dispatcher.add_handler(setwelcome_handler)
-        dispatcher.add_handler(togglewelcome_handler)
-        dispatcher.add_handler(toggleforceruleread_handler)
+        dispatcher.add_handler(start_handler, group=1)
+        dispatcher.add_handler(created_handler, group=1)
+        dispatcher.add_handler(migrated_handler, group=1)
+        dispatcher.add_handler(welcome_handler, group=1)
+        dispatcher.add_handler(clearwelcome_handler, group=1)
+        dispatcher.add_handler(setwelcome_handler, group=1)
+        dispatcher.add_handler(togglewelcome_handler, group=1)
+        dispatcher.add_handler(toggleforceruleread_handler, group=1)
 
     @staticmethod
     @run_async
@@ -835,16 +835,16 @@ class GroupStateHandler():
         controlchat_handler = CommandHandler('controlchat', GroupStateHandler.controlchat)
         setcontrolchat_handler = CommandHandler('setcontrolchat', GroupStateHandler.set_controlchat)
         setcommandratelimit_handler = CommandHandler('setcommandratelimit', GroupStateHandler.set_commandratelimit)
-        dispatcher.add_handler(description_handler)
-        dispatcher.add_handler(setdescription_handler)
-        dispatcher.add_handler(relatedchats_handler)
-        dispatcher.add_handler(addrelatedchat_handler)
-        dispatcher.add_handler(removerelatedchat_handler)
-        dispatcher.add_handler(invitelink_handler)
-        dispatcher.add_handler(revokeinvitelink_handler)
-        dispatcher.add_handler(controlchat_handler)
-        dispatcher.add_handler(setcontrolchat_handler)
-        dispatcher.add_handler(setcommandratelimit_handler)
+        dispatcher.add_handler(description_handler, group=1)
+        dispatcher.add_handler(setdescription_handler, group=1)
+        dispatcher.add_handler(relatedchats_handler, group=1)
+        dispatcher.add_handler(addrelatedchat_handler, group=1)
+        dispatcher.add_handler(removerelatedchat_handler, group=1)
+        dispatcher.add_handler(invitelink_handler, group=1)
+        dispatcher.add_handler(revokeinvitelink_handler, group=1)
+        dispatcher.add_handler(controlchat_handler, group=1)
+        dispatcher.add_handler(setcontrolchat_handler, group=1)
+        dispatcher.add_handler(setcommandratelimit_handler, group=1)
 
     @staticmethod
     @run_async
@@ -1114,11 +1114,11 @@ class RandomHandler():
         shake_handler = CommandHandler('shake', RandomHandler.shake)
         roulette_handler = CommandHandler('roulette', RandomHandler.roulette)
         toggleroulettekicks_handler = CommandHandler('toggleroulettekicks', RandomHandler.toggle_roulettekicks)
-        dispatcher.add_handler(roll_handler)
-        dispatcher.add_handler(flip_handler)
-        dispatcher.add_handler(shake_handler)
-        dispatcher.add_handler(roulette_handler)
-        dispatcher.add_handler(toggleroulettekicks_handler)
+        dispatcher.add_handler(roll_handler, group=1)
+        dispatcher.add_handler(flip_handler, group=1)
+        dispatcher.add_handler(shake_handler, group=1)
+        dispatcher.add_handler(roulette_handler, group=1)
+        dispatcher.add_handler(toggleroulettekicks_handler, group=1)
 
     @staticmethod
     @run_async
@@ -1326,9 +1326,9 @@ class RuleHandler():
         rules_handler = CommandHandler('rules', RuleHandler.send_rules)
         clearrules_handler = CommandHandler('clearrules', RuleHandler.clear_rules)
         setrules_handler = CommandHandler('setrules', RuleHandler.set_rules)
-        dispatcher.add_handler(rules_handler)
-        dispatcher.add_handler(clearrules_handler)
-        dispatcher.add_handler(setrules_handler)
+        dispatcher.add_handler(rules_handler, group=1)
+        dispatcher.add_handler(clearrules_handler, group=1)
+        dispatcher.add_handler(setrules_handler, group=1)
 
     @staticmethod
     @run_async
@@ -1435,17 +1435,17 @@ class ModerationHandler():
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
         togglemutegroup_handler = CommandHandler('togglemutegroup', ModerationHandler.toggle_mutegroup)
         message_handler = MessageHandler(Filters.all & (~Filters.private), ModerationHandler.handle_message)
-        dispatcher.add_handler(auditlog_handler)
-        dispatcher.add_handler(warnings_handler)
-        dispatcher.add_handler(warn_handler)
-        dispatcher.add_handler(clearwarnings_handler)
-        dispatcher.add_handler(kick_handler)
-        dispatcher.add_handler(ban_handler)
-        dispatcher.add_handler(say_handler)
-        dispatcher.add_handler(call_mods_handler)
-        dispatcher.add_handler(call_mods_handler2)
-        dispatcher.add_handler(togglemutegroup_handler)
-        dispatcher.add_handler(message_handler)
+        dispatcher.add_handler(auditlog_handler, group=1)
+        dispatcher.add_handler(warnings_handler, group=1)
+        dispatcher.add_handler(warn_handler, group=1)
+        dispatcher.add_handler(clearwarnings_handler, group=1)
+        dispatcher.add_handler(kick_handler, group=1)
+        dispatcher.add_handler(ban_handler, group=1)
+        dispatcher.add_handler(say_handler, group=1)
+        dispatcher.add_handler(call_mods_handler, group=1)
+        dispatcher.add_handler(call_mods_handler2, group=1)
+        dispatcher.add_handler(togglemutegroup_handler, group=1)
+        dispatcher.add_handler(message_handler, group=0)
 
     @staticmethod
     @run_async
@@ -1671,13 +1671,14 @@ class ModerationHandler():
         chat = CachedBot.get_chat(bot, update.message.chat.id)
         if chat.get_member(update.message.from_user.id).status not in ['creator', 'administrator']:
             update.message.delete()
+            raise DispatcherHandlerStop()
 
 
 class SauceNaoHandler():
     def __init__(self, dispatcher):
         saucenao_handler = CommandHandler('source', SauceNaoHandler.get_source)
         SupportsFilter.add_support('source', Filters.photo)
-        dispatcher.add_handler(saucenao_handler)
+        dispatcher.add_handler(saucenao_handler, group=1)
 
     @staticmethod
     @run_async
