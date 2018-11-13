@@ -1669,7 +1669,7 @@ class ModerationHandler():
             return
 
         chat = CachedBot.get_chat(bot, update.message.chat.id)
-        if chat.get_member(update.message.user.id).status not in ['creator', 'administrator']:
+        if chat.get_member(update.message.from_user.id).status not in ['creator', 'administrator']:
             update.message.delete()
 
 
