@@ -1433,6 +1433,8 @@ class ModerationHandler():
         say_handler = CommandHandler('say', ModerationHandler.say)
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
+        togglemutegroup_handler = CommandHandler('togglemutegroup', ModerationHandler.toggle_mutegroup)
+        message_handler = MessageHandler(Filters.chat(global_mutedgroups), ModerationHandler.handle_message)
         dispatcher.add_handler(auditlog_handler)
         dispatcher.add_handler(warnings_handler)
         dispatcher.add_handler(warn_handler)
@@ -1442,6 +1444,8 @@ class ModerationHandler():
         dispatcher.add_handler(say_handler)
         dispatcher.add_handler(call_mods_handler)
         dispatcher.add_handler(call_mods_handler2)
+        dispatcher.add_handler(togglemutegroup_handler)
+        dispatcher.add_handler(message_handler)
 
     @staticmethod
     @run_async
@@ -1636,6 +1640,35 @@ class ModerationHandler():
     def call_mods(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
 
+    @staticmethod
+    @run_async
+    @catch_errors
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def toggle_mutegroup(bot, update):
+        currently_enabled = update.message.chat.id in global_mutedgroups
+
+        try:
+            enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
+        except (IndexError, ValueError):
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(currently_enabled), reply_to_message_id=update.message.message_id)
+            return
+
+        if bool(enabled):
+            global_mutedgroups.add(update.message.chat.id)
+        else:
+            global_mutedgroups.discard(update.message.chat.id)
+
+        bot.send_message(chat_id=update.effective_chat.id, text="Mute group: {}\nPlease note, for performance reasons, this value is stored in memory and will be reset on bot restart.".format(str(enabled)), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    def handle_message(bot, update):
+        chat = CachedBot.get_chat(bot, update.message.chat.id)
+        if chat.get_member(update.message.user.id).status not in ['creator', 'administrator']:
+            update.message.delete()
+
 
 class SauceNaoHandler():
     def __init__(self, dispatcher):
@@ -1679,6 +1712,9 @@ class SauceNaoHandler():
 # Setup
 updater = Updater(token=token)
 dispatcher = updater.dispatcher
+
+# Global vars
+global_mutedgroups = set()
 
 # Initialize handler
 ErrorHandler(dispatcher)
