@@ -1663,7 +1663,6 @@ class ModerationHandler():
         bot.send_message(chat_id=update.effective_chat.id, text="Mute group: {}\nPlease note, for performance reasons, this value is stored in memory and will be reset on bot restart.".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     def handle_message(bot, update):
         if update.message.chat.id not in global_mutedgroups:
             return
