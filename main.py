@@ -35,7 +35,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, DispatcherHandler
 from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 
 cache = TTLCache(maxsize=100, ttl=600)
 
