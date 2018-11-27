@@ -30,12 +30,12 @@ import sqlalchemy
 from cachetools import cached, TTLCache
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
-from telegram.error import Unauthorized, TelegramError
+from telegram.error import BadRequest, Unauthorized, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
 from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 
 cache = TTLCache(maxsize=100, ttl=600)
 
@@ -1606,8 +1606,8 @@ class ModerationHandler():
 
         try:
             bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        except Unauthorized:
-            chat = CachedBot.get_chat(bot, update.message.chat.id)
+        except (BadRequest, Unauthorized):
+            chat = CachedBot.get_chat(bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
                 bot.send_message(chat_id=update.message.chat.id, text="I can't kick the chat owner.", reply_to_message_id=update.message.message_id)
@@ -1648,8 +1648,8 @@ class ModerationHandler():
 
         try:
             bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        except Unauthorized:
-            chat = CachedBot.get_chat(bot, update.message.chat.id)
+        except (BadRequest, Unauthorized):
+            chat = CachedBot.get_chat(bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
                 bot.send_message(chat_id=update.message.chat.id, text="I can't ban the chat owner.", reply_to_message_id=update.message.message_id)
