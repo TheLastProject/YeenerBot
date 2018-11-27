@@ -1608,7 +1608,7 @@ class ModerationHandler():
             bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         except Unauthorized:
             chat = CachedBot.get_chat(bot, update.message.chat.id)
-            user_status = chat.get_member(update.message.from_user.id).status
+            user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
                 bot.send_message(chat_id=update.message.chat.id, text="I can't kick the chat owner.", reply_to_message_id=update.message.message_id)
             elif user_status == 'administrator':
@@ -1650,7 +1650,7 @@ class ModerationHandler():
             bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         except Unauthorized:
             chat = CachedBot.get_chat(bot, update.message.chat.id)
-            user_status = chat.get_member(update.message.from_user.id).status
+            user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
                 bot.send_message(chat_id=update.message.chat.id, text="I can't ban the chat owner.", reply_to_message_id=update.message.message_id)
             elif user_status == 'administrator':
