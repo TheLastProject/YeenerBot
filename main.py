@@ -1604,7 +1604,22 @@ class ModerationHandler():
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        try:
+            bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        except Unauthorized:
+            chat = CachedBot.get_chat(bot, update.message.chat.id)
+            user_status = chat.get_member(update.message.from_user.id).status
+            if user_status == 'creator':
+                bot.send_message(chat_id=update.message.chat.id, text="I can't kick the chat owner.", reply_to_message_id=update.message.message_id)
+            elif user_status == 'administrator':
+                for admin in chat.get_administrators():
+                    if admin.status == 'creator':
+                        bot.send_message(chat_id=update.message.chat.id, text="If you want to kick another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
+                        return
+            else:
+                bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to kick anyone.", reply_to_message_id=update.message.message_id)
+            return
+
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
@@ -1631,7 +1646,22 @@ class ModerationHandler():
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        try:
+            bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        except Unauthorized:
+            chat = CachedBot.get_chat(bot, update.message.chat.id)
+            user_status = chat.get_member(update.message.from_user.id).status
+            if user_status == 'creator':
+                bot.send_message(chat_id=update.message.chat.id, text="I can't ban the chat owner.", reply_to_message_id=update.message.message_id)
+            elif user_status == 'administrator':
+                for admin in chat.get_administrators():
+                    if admin.status == 'creator':
+                        bot.send_message(chat_id=update.message.chat.id, text="If you want to ban another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
+                        return
+            else:
+                bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to ban anyone.", reply_to_message_id=update.message.message_id)
+            return
+
         bot.send_message(chat_id=update.message.chat.id, text="I've banned {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
