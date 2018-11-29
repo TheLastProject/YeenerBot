@@ -1437,6 +1437,8 @@ class ModerationHandler():
         SupportsFilter.add_support('warn', Filters.forwarded)
         clearwarnings_handler = CommandHandler('clearwarnings', ModerationHandler.clearwarnings)
         SupportsFilter.add_support('clearwarnings', Filters.forwarded)
+        mute_handler = CommandHandler('mute', ModerationHandler.mute)
+        unmute_handler = CommandHandler('unmute', ModerationHandler.unmute)
         kick_handler = CommandHandler('kick', ModerationHandler.kick)
         SupportsFilter.add_support('kick', Filters.forwarded)
         ban_handler = CommandHandler('ban', ModerationHandler.ban)
@@ -1450,6 +1452,8 @@ class ModerationHandler():
         dispatcher.add_handler(warnings_handler, group=1)
         dispatcher.add_handler(warn_handler, group=1)
         dispatcher.add_handler(clearwarnings_handler, group=1)
+        dispatcher.add_handler(mute_handler, group=1)
+        dispatcher.add_handler(unmute_handler, group=1)
         dispatcher.add_handler(kick_handler, group=1)
         dispatcher.add_handler(ban_handler, group=1)
         dispatcher.add_handler(say_handler, group=1)
@@ -1580,6 +1584,56 @@ class ModerationHandler():
         groupmember.save()
 
         bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @ensure_admin
+    def mute(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to mute the person who wrote it.", reply_to_message_id=update.message.message_id)
+            return
+
+        message = update.message.reply_to_message
+
+        try:
+            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, can_send_messages=False)
+        except (BadRequest, Unauthorized):
+            chat = CachedBot.get_chat(bot, message.chat_id)
+            user_status = chat.get_member(message.from_user.id).status
+            if user_status == 'creator':
+                bot.send_message(chat_id=update.message.chat.id, text="I can't mute the chat owner.", reply_to_message_id=update.message.message_id)
+            elif user_status == 'administrator':
+                for admin in chat.get_administrators():
+                    if admin.status == 'creator':
+                        bot.send_message(chat_id=update.message.chat.id, text="If you want to mute another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
+                        return
+            else:
+                bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
+            return
+
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @ensure_admin
+    def unmute(bot, update):
+        if not update.message.reply_to_message:
+            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to unmute the person who wrote it.", reply_to_message_id=update.message.message_id)
+            return
+
+        message = update.message.reply_to_message
+
+        try:
+            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, can_send_messages=True)
+        except (BadRequest, Unauthorized):
+            bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to unmute this person.", reply_to_message_id=update.message.message_id)
+            return
+
+        bot.send_message(chat_id=update.message.chat.id, text="I've unmuted {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
