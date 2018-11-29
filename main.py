@@ -1628,7 +1628,7 @@ class ModerationHandler():
         message = update.message.reply_to_message
 
         try:
-            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, can_send_messages=True)
+            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
         except (BadRequest, Unauthorized):
             bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to unmute this person.", reply_to_message_id=update.message.message_id)
             return
