@@ -483,7 +483,9 @@ class Helpers():
         duration_string = duration_string + " "
         matches = re.findall(r'[0-9]+[mhdw ]', duration_string)
         for match in matches:
-            if match[-1] == "m" or match[-1] == " ":
+            if match[-1] == "s":
+                duration += int(match[:-1])
+            elif match[-1] == "m" or match[-1] == " ":
                 duration += (int(match[:-1]) * 60)
             elif match[-1] == "h":
                 duration += (int(match[:-1]) * 60 * 60)
