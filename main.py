@@ -477,6 +477,24 @@ class CachedBot():
 
 class Helpers():
     @staticmethod
+    def parse_duration(duration_string):
+        duration = 0
+        # Simplify parsing
+        duration_string = duration_string + " "
+        matches = re.findall(r'[0-9]+[mhdw ]', duration_string)
+        for match in matches:
+            if match[-1] == "m" or match[-1] == " ":
+                duration += (int(match[:-1]) * 60)
+            elif match[-1] == "h":
+                duration += (int(match[:-1]) * 60 * 60)
+            elif match[-1] == "d":
+                duration += (int(match[:-1]) * 60 * 60 * 24)
+            elif match[-1] == "w":
+                duration += (int(match[:-1]) * 60 * 60 * 24 * 7)
+
+        return duration
+
+    @staticmethod
     def get_creator(chat):
         for admin in chat.get_administrators():
             if admin.status == "creator":
@@ -1596,9 +1614,13 @@ class ModerationHandler():
             return
 
         message = update.message.reply_to_message
+        try:
+            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1])
+        except IndexError:
+            until_date = None
 
         try:
-            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, can_send_messages=False)
+            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date, can_send_messages=False)
         except (BadRequest, Unauthorized):
             chat = CachedBot.get_chat(bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
@@ -1613,7 +1635,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}).".format(message.from_user.name, datetime.datetime.utcfromtimestamp(until_date) if until_date else "never"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1692,6 +1714,11 @@ class ModerationHandler():
         warnings = json.loads(groupmember.warnings)
 
         try:
+            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1])
+        except IndexError:
+            until_date = None
+
+        try:
             reason = '[BAN] {}'.format(update.message.text.split(' ', 1)[1])
         except IndexError:
             reason = '[BAN]'
@@ -1701,7 +1728,7 @@ class ModerationHandler():
         groupmember.save()
 
         try:
-            bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+            bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date)
         except (BadRequest, Unauthorized):
             chat = CachedBot.get_chat(bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
@@ -1716,7 +1743,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to ban anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've banned {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}).".format(message.from_user.name, datetime.datetime.utcfromtimestamp(until_date) if until_date else "never"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
