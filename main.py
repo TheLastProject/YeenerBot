@@ -481,20 +481,20 @@ class Helpers():
         duration = 0
         # Simplify parsing
         duration_string = duration_string + " "
-        matches = re.findall(r'[0-9]+[mhdw ]', duration_string)
+        matches = re.findall(r'[0-9.]+[smhdw ]', duration_string)
         for match in matches:
             if match[-1] == "s":
-                duration += int(match[:-1])
+                duration += float(match[:-1])
             elif match[-1] == "m" or match[-1] == " ":
-                duration += (int(match[:-1]) * 60)
+                duration += (float(match[:-1]) * 60)
             elif match[-1] == "h":
-                duration += (int(match[:-1]) * 60 * 60)
+                duration += (float(match[:-1]) * 60 * 60)
             elif match[-1] == "d":
-                duration += (int(match[:-1]) * 60 * 60 * 24)
+                duration += (float(match[:-1]) * 60 * 60 * 24)
             elif match[-1] == "w":
-                duration += (int(match[:-1]) * 60 * 60 * 24 * 7)
+                duration += (float(match[:-1]) * 60 * 60 * 24 * 7)
 
-        return duration
+        return int(round(duration))
 
     @staticmethod
     def get_creator(chat):
