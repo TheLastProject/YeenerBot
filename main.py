@@ -477,7 +477,7 @@ class CachedBot():
 
 class Helpers():
     @staticmethod
-    def parse_duration(duration_string):
+    def parse_duration(duration_string, min_duration=None, max_duration=None):
         duration = 0
         # Simplify parsing
         duration_string = duration_string + " "
@@ -493,6 +493,12 @@ class Helpers():
                 duration += (float(match[:-1]) * 60 * 60 * 24)
             elif match[-1] == "w":
                 duration += (float(match[:-1]) * 60 * 60 * 24 * 7)
+
+        if duration != 0:
+            if min_duration and duration < min_duration:
+                return min_duration
+            elif max_duration and duration > max_duration:
+                return max_duration
 
         return int(round(duration))
 
@@ -1616,7 +1622,8 @@ class ModerationHandler():
             return
 
         try:
-            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1])
+            # min 1 minute, max 1 year, other things are considered permanent by Telegram
+            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
         except IndexError:
             until_date = None
 
@@ -1728,7 +1735,8 @@ class ModerationHandler():
         warnings = json.loads(groupmember.warnings)
 
         try:
-            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1])
+            # min 1 minute, max 1 year, other things are considered permanent by Telegram
+            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
         except IndexError:
             until_date = None
 
