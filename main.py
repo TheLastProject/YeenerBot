@@ -1128,7 +1128,7 @@ class GroupStateHandler():
         group = DB.get_group(update.message.chat.id)
         text = "Member can now only execute one fun command per {} seconds."
         try:
-            group.commandratelimit = int(update.message.text.split(' ', 1)[1])
+            group.commandratelimit = Helpers.parse_duration(update.message.text.split(' ', 1)[1])
         except (IndexError, TypeError):
             group.commandratelimit = 0
             text = "Command rate limit reset to default ({} seconds)."
