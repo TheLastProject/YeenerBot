@@ -1615,11 +1615,23 @@ class ModerationHandler():
             bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to mute the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
-        message = update.message.reply_to_message
         try:
             until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1])
         except IndexError:
             until_date = None
+
+        message = update.message.reply_to_message
+        groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
+        warnings = json.loads(groupmember.warnings)
+
+        try:
+            reason = '[MUTE] {}'.format(update.message.text.split(' ', 1)[1])
+        except IndexError:
+            reason = '[MUTE]'
+
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        groupmember.warnings = json.dumps(warnings)
+        groupmember.save()
 
         try:
             bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date, can_send_messages=False)
