@@ -1774,7 +1774,12 @@ class ModerationHandler():
     @resolve_chat
     @ensure_admin
     def say(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text=" ".join(update.message.text.split(' ')[1:]))
+        message = update.message.text.split(' ', 1)
+        if len(message) == 1:
+            bot.send_message(chat_id=update.message.chat_id, text="Say what?", reply_to_message_id=update.message.message_id)
+            return
+
+        bot.send_message(chat_id=update.message.chat_id, text=message[1])
 
     @staticmethod
     @run_async
