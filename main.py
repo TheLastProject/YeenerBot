@@ -366,7 +366,7 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0):
+    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
         self.group_id = group_id
         self.welcome_enabled = welcome_enabled
         self.welcome_message = welcome_message
@@ -380,10 +380,11 @@ class Group():
         self.controlchannel_id = controlchannel_id
         self.roulettekicks_enabled = roulettekicks_enabled
         self.commandratelimit = commandratelimit
+        self.revoke_invite_link_after_join = revoke_invite_link_after_join
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit']
+        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
 
     @staticmethod
     def get_types():
@@ -399,7 +400,8 @@ class Group():
                 'auditlog': sqlalchemy.types.Text,
                 'controlchannel_id': sqlalchemy.types.BigInteger,
                 'roulettekicks_enabled': sqlalchemy.types.Boolean,
-                'commandratelimit': sqlalchemy.types.Integer}
+                'commandratelimit': sqlalchemy.types.Integer,
+                'revoke_invite_link_after_join': sqlalchemy.types.Boolean}
 
     def serialize(self):
         return {_key: getattr(self, _key) for _key in Group.get_keys()}
@@ -833,6 +835,9 @@ class GreetingHandler():
         members = [member for member in update.message.new_chat_members if not member.is_bot]
         if len(members) == 0:
             return
+
+        if group.revoke_invite_link_after_join:
+            bot.export_chat_invite_link(update.message.chat.id)
 
         if group.welcome_message:
             text = group.welcome_message
@@ -1473,6 +1478,7 @@ class ModerationHandler():
         call_mods_handler = CommandHandler('admins', ModerationHandler.call_mods)
         call_mods_handler2 = CommandHandler('mods', ModerationHandler.call_mods)
         togglemutegroup_handler = CommandHandler('togglemutegroup', ModerationHandler.toggle_mutegroup)
+        togglerevokeinvitelinkafterjoin_handler = CommandHandler('togglerevokeinvitelinkafterjoin', ModerationHandler.toggle_revokeinvitelinkafterjoin)
         message_handler = MessageHandler(Filters.all & (~Filters.private), ModerationHandler.handle_message)
         dispatcher.add_handler(auditlog_handler, group=1)
         dispatcher.add_handler(warnings_handler, group=1)
@@ -1486,6 +1492,7 @@ class ModerationHandler():
         dispatcher.add_handler(call_mods_handler, group=1)
         dispatcher.add_handler(call_mods_handler2, group=1)
         dispatcher.add_handler(togglemutegroup_handler, group=1)
+        dispatcher.add_handler(togglerevokeinvitelinkafterjoin_handler, group=1)
         dispatcher.add_handler(message_handler, group=0)
 
     @staticmethod
@@ -1810,6 +1817,26 @@ class ModerationHandler():
             global_mutedgroups.discard(update.message.chat.id)
 
         bot.send_message(chat_id=update.effective_chat.id, text="Mute group: {}\nPlease note, for performance reasons, this value is stored in memory and will be reset on bot restart.".format(str(enabled)), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def toggle_revokeinvitelinkafterjoin(bot, update):
+        group = DB.get_group(update.message.chat.id)
+
+        try:
+            enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
+        except (IndexError, ValueError):
+            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.revoke_invite_link_after_join)))), reply_to_message_id=update.message.message_id)
+            return
+
+        group.revoke_invite_link_after_join = enabled
+        group.save()
+
+        bot.send_message(chat_id=update.effective_chat.id, text="Revoke invite link after join: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     def handle_message(bot, update):
