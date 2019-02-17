@@ -407,7 +407,7 @@ class Group():
 
         for feature in json.loads(self.enabled_features):
             if feature in supported_features:
-                features.add(feature)
+                features.append(feature)
         for feature in json.loads(self.disabled_features):
             try:
                 features.remove(feature)
