@@ -405,10 +405,10 @@ class Group():
         features = supported_features
         features.remove('source')  # May return adult content, disabled by default
 
-        for feature in self.enabled_features:
+        for feature in json.loads(self.enabled_features):
             if feature in supported_features:
                 features.add(feature)
-        for feature in self.disabled_features:
+        for feature in json.loads(self.disabled_features):
             try:
                 features.remove(feature)
             except ValueError:
@@ -789,15 +789,19 @@ class FeatureHandler():
             return
 
         try:
-            group.enabled_features.remove(feature)
+            enabled_features = json.loads(group.enabled_features)
+            enabled_features.remove(feature)
+            group.enabled_features = json.dumps(enabled_features)
         except ValueError:
             pass
 
-        if feature in group.disabled_features:
+        disabled_features = json.loads(group.disabled_features)
+        if feature in disabled_features:
             bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly disabled.", reply_to_message_id=update.message.message_id)
             return
 
-        group.disabled_features.append(feature)
+        disabled_features.append(feature)
+        group.disabled_features = json.dumps(disabled_features)
         group.save()
 
         bot.send_message(chat_id=update.effective_chat.id, text="Feature {} disabled".format(feature), reply_to_message_id=update.message.message_id)
@@ -822,15 +826,19 @@ class FeatureHandler():
             return
 
         try:
-            group.disabled_features.remove(feature)
+            disabled_features = json.loads(group.disabled_features)
+            disabled_features.remove(feature)
+            group.disabled_features = json.dumps(disabled_features)
         except ValueError:
             pass
 
-        if feature in group.enabled_features:
+        enabled_features = json.loads(group.enabled_features)
+        if feature in enabled_features:
             bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly enabled.", reply_to_message_id=update.message.message_id)
             return
 
-        group.enabled_features.append(feature)
+        enabled_features.append(feature)
+        group.enabled_features = json.dumps(enabled_features)
         group.save()
 
         bot.send_message(chat_id=update.effective_chat.id, text="Feature {} enabled".format(feature), reply_to_message_id=update.message.message_id)
