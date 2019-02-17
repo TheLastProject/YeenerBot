@@ -758,7 +758,6 @@ class FeatureHandler():
     @retry
     @busy_indicator
     @resolve_chat
-    @ensure_admin
     def list_features(bot, update):
         group = DB.get_group(update.message.chat.id)
         enabled_features = group.get_enabled_features()
