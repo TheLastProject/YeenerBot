@@ -62,6 +62,23 @@ db_username = config['DATABASE']['Username']
 db_password = config['DATABASE']['Password']
 db_name = config['DATABASE']['Name']
 
+def feature(feature_name):
+    def real_feature(function):
+        def wrapper(bot, update, **optional_args):
+            group = DB.get_group(update.message.chat.id)
+            if feature_name in group.get_enabled_features():
+                return function(bot=bot, update=update, **optional_args)
+            else:
+                member = update.message.chat.get_member(update.message.from_user.id)
+                if member.status in ['creator', 'administrator']:
+                    bot.send_message(chat_id=update.effective_chat.id, text="Feature {} is disabled, but caller is an administrator, allowing anyway...".format(feature_name), reply_to_message_id=update.message.message_id)
+                    return function(bot=bot, update=update, **optional_args)
+
+            bot.send_message(chat_id=update.effective_chat.id, text="Sorry, but this feature ({}) is disabled in this chat".format(feature_name), reply_to_message_id=update.message.message_id)
+
+            return
+        return wrapper
+    return real_feature
 
 def retry(function):
     def wrapper(bot, update, **optional_args):
@@ -366,9 +383,10 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, welcome_enabled=True, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
+    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
         self.group_id = group_id
-        self.welcome_enabled = welcome_enabled
+        self.enabled_features = enabled_features if enabled_features is not None else json.dumps([])
+        self.disabled_features = disabled_features if disabled_features is not None else json.dumps([])
         self.welcome_message = welcome_message
         self.forceruleread_enabled = forceruleread_enabled
         self.description = description
@@ -382,14 +400,35 @@ class Group():
         self.commandratelimit = commandratelimit
         self.revoke_invite_link_after_join = revoke_invite_link_after_join
 
+    def get_enabled_features(self):
+        supported_features = Group.get_features()
+        features = supported_features
+        features.remove('source')  # May return adult content, disabled by default
+
+        for feature in self.enabled_features:
+            if feature in supported_features:
+                features.add(feature)
+        for feature in self.disabled_features:
+            try:
+                features.remove(feature)
+            except IndexError:
+                pass
+
+        return features
+
+    @staticmethod
+    def get_features():
+        return ['welcome', 'invitelink', 'roulette', 'roll', 'flip', 'shake', 'admins', 'warnings', 'say', 'source']
+
     @staticmethod
     def get_keys():
-        return ['group_id', 'welcome_enabled', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
+        return ['group_id', 'enabled_features', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
 
     @staticmethod
     def get_types():
         return {'group_id': sqlalchemy.types.BigInteger,
-                'welcome_enabled': sqlalchemy.types.Boolean,
+                'enabled_features': sqlalchemy.types.Text,
+                'disabled_features': sqlalchemy.types.Text,
                 'welcome_message': sqlalchemy.types.Text,
                 'forceruleread_enabled': sqlalchemy.types.Boolean,
                 'description': sqlalchemy.types.Text,
@@ -705,6 +744,98 @@ class SudoHandler():
 
         bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 300 seconds).", reply_to_message_id=update.message.message_id)
 
+class FeatureHandler():
+    def __init__(self, dispatcher):
+        listfeatures_handler = CommandHandler('features', FeatureHandler.list_features)
+        disablefeature_handler = CommandHandler('disablefeature', FeatureHandler.disable_feature)
+        enablefeature_handler = CommandHandler('enablefeature', FeatureHandler.enable_feature)
+        dispatcher.add_handler(listfeatures_handler, group=1)
+        dispatcher.add_handler(disablefeature_handler, group=1)
+        dispatcher.add_handler(enablefeature_handler, group=1)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def list_feature(bot, update):
+        group = DB.get_group(update.message.chat.id)
+        enabled_features = group.get_enabled_features()
+
+        text = ""
+        for feature in sorted(Group.get_features()):
+            text += "{}: {}\n".format(feature, 'enabled' if feature in enabled_features else 'disabled')
+
+        bot.send_message(chat_id=update.effective_chat.id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def disable_feature(bot, update):
+        group = DB.get_group(update.message.chat.id)
+
+        try:
+            feature = update.message.text.split(' ', 1)[1]
+        except IndexError:
+            bot.send_message(chat_id=update.effective_chat.id, text="Please specify a feature to disable.", reply_to_message_id=update.message.message_id)
+            return
+
+        if feature not in Group.get_features():
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.", reply_to_message_id=update.message.message_id)
+            return
+
+        try:
+            group.enabled_features.remove(feature)
+        except IndexError:
+            pass
+
+        if feature in group.disabled_features:
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly disabled.", reply_to_message_id=update.message.message_id)
+            return
+
+        group.disabled_features.append(feature)
+        group.save()
+
+        bot.send_message(chat_id=update.effective_chat.id, text="Feature {} disabled".format(feature), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def enable_feature(bot, update):
+        group = DB.get_group(update.message.chat.id)
+
+        try:
+            feature = update.message.text.split(' ', 1)[1]
+        except IndexError:
+            bot.send_message(chat_id=update.effective_chat.id, text="Please specify a feature to enable.", reply_to_message_id=update.message.message_id)
+            return
+
+        if feature not in Group.get_features():
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.", reply_to_message_id=update.message.message_id)
+            return
+
+        try:
+            group.disabled_features.remove(feature)
+        except IndexError:
+            pass
+
+        if feature in group.enabled_features:
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly enabled.", reply_to_message_id=update.message.message_id)
+            return
+
+        group.enabled_features.append(feature)
+        group.save()
+
+        bot.send_message(chat_id=update.effective_chat.id, text="Feature {} enabled".format(feature), reply_to_message_id=update.message.message_id)
+
+
 
 class GreetingHandler():
     def __init__(self, dispatcher):
@@ -714,7 +845,6 @@ class GreetingHandler():
         welcome_handler = MessageHandler(Filters.status_update.new_chat_members, GreetingHandler.welcome)
         clearwelcome_handler = CommandHandler('clearwelcome', GreetingHandler.clear_welcome)
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
-        togglewelcome_handler = CommandHandler('togglewelcome', GreetingHandler.toggle_welcome)
         toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
         dispatcher.add_handler(start_handler, group=1)
         dispatcher.add_handler(created_handler, group=1)
@@ -722,7 +852,6 @@ class GreetingHandler():
         dispatcher.add_handler(welcome_handler, group=1)
         dispatcher.add_handler(clearwelcome_handler, group=1)
         dispatcher.add_handler(setwelcome_handler, group=1)
-        dispatcher.add_handler(togglewelcome_handler, group=1)
         dispatcher.add_handler(toggleforceruleread_handler, group=1)
 
     @staticmethod
@@ -777,26 +906,6 @@ class GreetingHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def toggle_welcome(bot, update):
-        group = DB.get_group(update.message.chat.id)
-
-        try:
-            enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
-        except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.welcome_enabled)))), reply_to_message_id=update.message.message_id)
-            return
-
-        group.welcome_enabled = enabled
-        group.save()
-
-        bot.send_message(chat_id=update.effective_chat.id, text="Welcome: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
-
-    @staticmethod
-    @run_async
-    @retry
-    @busy_indicator
-    @resolve_chat
-    @ensure_admin
     def toggle_forceruleread(bot, update):
         group = DB.get_group(update.message.chat.id)
 
@@ -809,7 +918,7 @@ class GreetingHandler():
         group.forceruleread_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), group.welcome_enabled, group.rules is not None), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -824,12 +933,11 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
+    @feature('welcome')
     @retry
     @busy_indicator
     def welcome(bot, update):
         group = DB.get_group(update.message.chat.id)
-        if not group.welcome_enabled:
-            return
 
         # Don't welcome bots (or ourselves)
         members = [member for member in update.message.new_chat_members if not member.is_bot]
@@ -1108,6 +1216,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @feature('invitelink')
     @retry
     @busy_indicator
     @resolve_chat
@@ -1121,6 +1230,7 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
+    @feature('invitelink')
     @retry
     @busy_indicator
     @resolve_chat
@@ -1164,6 +1274,7 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @feature('roll')
     @retry
     @busy_indicator
     @rate_limited
@@ -1249,6 +1360,7 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @feature('flip')
     @retry
     @busy_indicator
     @rate_limited
@@ -1261,6 +1373,7 @@ class RandomHandler():
 
     @staticmethod
     @run_async
+    @feature('shake')
     @retry
     @busy_indicator
     @rate_limited
@@ -1289,6 +1402,7 @@ class RandomHandler():
         ])), reply_to_message_id=update.message.message_id)
 
     @staticmethod
+    @feature('roulette')
     @retry
     @busy_indicator
     @rate_limited
@@ -1533,6 +1647,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @feature('warnings')
     @retry
     @busy_indicator
     @resolve_chat
@@ -1776,6 +1891,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @feature('say')
     @retry
     @busy_indicator
     @resolve_chat
@@ -1790,6 +1906,7 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
+    @feature('admins')
     @retry
     @busy_indicator
     @requires_confirmation
@@ -1857,6 +1974,7 @@ class SauceNaoHandler():
 
     @staticmethod
     @run_async
+    @feature('source')
     @retry
     @busy_indicator
     def get_source(bot, update):
@@ -1900,6 +2018,7 @@ ErrorHandler(dispatcher)
 CallbackHandler(dispatcher)
 DebugHandler(dispatcher)
 SudoHandler(dispatcher)
+FeatureHandler(dispatcher)
 GreetingHandler(dispatcher)
 GroupStateHandler(dispatcher)
 RandomHandler(dispatcher)
