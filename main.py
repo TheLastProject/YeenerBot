@@ -797,7 +797,7 @@ class FeatureHandler():
 
         disabled_features = json.loads(group.disabled_features)
         if feature in disabled_features:
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly disabled.", reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly disabled.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         disabled_features.append(feature)
@@ -834,7 +834,7 @@ class FeatureHandler():
 
         enabled_features = json.loads(group.enabled_features)
         if feature in enabled_features:
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly enabled.", reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly enabled.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         enabled_features.append(feature)
