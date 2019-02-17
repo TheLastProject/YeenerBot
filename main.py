@@ -785,7 +785,7 @@ class FeatureHandler():
             return
 
         if feature not in Group.get_features():
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.", reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         try:
@@ -822,7 +822,7 @@ class FeatureHandler():
             return
 
         if feature not in Group.get_features():
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.", reply_to_message_id=update.message.message_id)
+            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         try:
