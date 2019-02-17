@@ -422,7 +422,7 @@ class Group():
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'enabled_features', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
+        return ['group_id', 'enabled_features', 'disabled_features', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
 
     @staticmethod
     def get_types():
