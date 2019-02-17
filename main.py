@@ -411,7 +411,7 @@ class Group():
         for feature in self.disabled_features:
             try:
                 features.remove(feature)
-            except IndexError:
+            except ValueError:
                 pass
 
         return features
@@ -790,7 +790,7 @@ class FeatureHandler():
 
         try:
             group.enabled_features.remove(feature)
-        except IndexError:
+        except ValueError:
             pass
 
         if feature in group.disabled_features:
@@ -823,7 +823,7 @@ class FeatureHandler():
 
         try:
             group.disabled_features.remove(feature)
-        except IndexError:
+        except ValueError:
             pass
 
         if feature in group.enabled_features:
