@@ -402,7 +402,7 @@ class Group():
 
     def get_enabled_features(self):
         supported_features = Group.get_features()
-        features = supported_features
+        features = supported_features[:]
         features.remove('source')  # May return adult content, disabled by default
 
         for feature in json.loads(self.enabled_features):
