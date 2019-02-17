@@ -65,6 +65,9 @@ db_name = config['DATABASE']['Name']
 def feature(feature_name):
     def real_feature(function):
         def wrapper(bot, update, **optional_args):
+            if update.message.chat.type == 'private':
+                return function(bot=bot, update=update, **optional_args)
+
             group = DB.get_group(update.message.chat.id)
             if feature_name in group.get_enabled_features():
                 return function(bot=bot, update=update, **optional_args)
