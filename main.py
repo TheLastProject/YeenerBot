@@ -791,6 +791,7 @@ class FeatureHandler():
             enabled_features = json.loads(group.enabled_features)
             enabled_features.remove(feature)
             group.enabled_features = json.dumps(enabled_features)
+            group.save()
         except ValueError:
             pass
 
@@ -828,6 +829,7 @@ class FeatureHandler():
             disabled_features = json.loads(group.disabled_features)
             disabled_features.remove(feature)
             group.disabled_features = json.dumps(disabled_features)
+            group.save()
         except ValueError:
             pass
 
