@@ -945,9 +945,9 @@ class GreetingHandler():
 
     @staticmethod
     @run_async
-    @feature('welcome')
     @retry
     @busy_indicator
+    @feature('welcome')
     def welcome(bot, update):
         group = DB.get_group(update.message.chat.id)
 
@@ -1228,10 +1228,10 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
-    @feature('invitelink')
     @retry
     @busy_indicator
     @resolve_chat
+    @feature('invitelink')
     def invitelink(bot, update):
         invite_link = Helpers.get_invite_link(bot, update.message.chat)
         if not invite_link:
@@ -1242,11 +1242,11 @@ class GroupStateHandler():
 
     @staticmethod
     @run_async
-    @feature('invitelink')
     @retry
     @busy_indicator
     @resolve_chat
     @ensure_admin
+    @feature('invitelink')
     def revokeinvitelink(bot, update):
         bot.export_chat_invite_link(update.message.chat.id)
         bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
@@ -1286,9 +1286,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
-    @feature('roll')
     @retry
     @busy_indicator
+    @feature('roll')
     @rate_limited
     def roll(bot, update):
         results = []
@@ -1372,9 +1372,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
-    @feature('flip')
     @retry
     @busy_indicator
+    @feature('flip')
     @rate_limited
     def flip(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
@@ -1385,9 +1385,9 @@ class RandomHandler():
 
     @staticmethod
     @run_async
-    @feature('shake')
     @retry
     @busy_indicator
+    @feature('shake')
     @rate_limited
     def shake(bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
@@ -1414,9 +1414,9 @@ class RandomHandler():
         ])), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @feature('roulette')
     @retry
     @busy_indicator
+    @feature('roulette')
     @rate_limited
     def roulette(bot, update):
         group = DB.get_group(update.message.chat.id)
@@ -1659,10 +1659,10 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
-    @feature('warnings')
     @retry
     @busy_indicator
     @resolve_chat
+    @feature('warnings')
     def warnings(bot, update):
         if update.message.reply_to_message:
             message = update.message.reply_to_message
@@ -1903,11 +1903,11 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
-    @feature('say')
     @retry
     @busy_indicator
     @resolve_chat
     @ensure_admin
+    @feature('say')
     def say(bot, update):
         message = update.message.text.split(' ', 1)
         if len(message) == 1:
@@ -1918,9 +1918,9 @@ class ModerationHandler():
 
     @staticmethod
     @run_async
-    @feature('admins')
     @retry
     @busy_indicator
+    @feature('admins')
     @requires_confirmation
     def call_mods(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
@@ -1986,9 +1986,9 @@ class SauceNaoHandler():
 
     @staticmethod
     @run_async
-    @feature('source')
     @retry
     @busy_indicator
+    @feature('source')
     def get_source(bot, update):
         if not update.message.reply_to_message:
             bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.", reply_to_message_id=update.message.message_id)
