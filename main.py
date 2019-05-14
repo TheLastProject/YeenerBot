@@ -600,6 +600,30 @@ class Helpers():
 
         return chats
 
+    @staticmethod
+    def format_warnings(bot, chat, warnings):
+        chat = CachedBot.get_chat(bot, chat.id)
+
+        warningtext = ""
+
+        for warning in reversed(warnings):
+            try:
+                warnedby = chat.get_member(warning['warnedby'])
+            except TelegramError:
+                # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
+                continue
+
+            link = None
+            try:
+                link = warning['link']
+            except KeyError:
+                # Older warnings don't have a link stored
+                continue
+
+            warningtext += "\n[{} UTC] warned by {} (reason: {}) {}".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "[{}]".format(link) if link else "")
+
+        return warningtext
+
 
 class CallbackHandler():
     def __init__(self, dispatcher):
@@ -1675,21 +1699,7 @@ class ModerationHandler():
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
-        for warning in reversed(warnings):
-            try:
-                warnedby = update.message.chat.get_member(warning['warnedby'])
-            except TelegramError:
-                # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
-                continue
-
-            link = None
-            try:
-                link = warning['link']
-            except KeyError:
-                # Older warnings don't have a link stored
-                continue
-
-            warningtext += "\n[{} UTC] warned by {} (reason: {}) {}".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "[{}]".format(link) if link else "")
+        warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
 
         bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
@@ -1723,6 +1733,15 @@ class ModerationHandler():
         warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information.".format(message.from_user.name, len(warnings))
 
         bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
+
+        group = DB.get_group(update.message.chat.id)
+        if group.controlchannel_id:
+            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
+            warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
+            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+
+            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+
 
     @staticmethod
     @run_async
@@ -1788,9 +1807,16 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        link = message.link
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}) {}.".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}) {}.".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", "[{}]".format(link) if link else ""), reply_to_message_id=update.message.message_id)
+        group = DB.get_group(update.message.chat.id)
+        if group.controlchannel_id:
+            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
+            warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
+            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+
+            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+
 
     @staticmethod
     @run_async
@@ -1854,6 +1880,14 @@ class ModerationHandler():
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
+        group = DB.get_group(update.message.chat.id)
+        if group.controlchannel_id:
+            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
+            warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
+            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+
+            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+
     @staticmethod
     @run_async
     @retry
@@ -1900,6 +1934,14 @@ class ModerationHandler():
             return
 
         bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}).".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
+
+        group = DB.get_group(update.message.chat.id)
+        if group.controlchannel_id:
+            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
+            warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
+            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+
+            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
     @staticmethod
     @run_async
