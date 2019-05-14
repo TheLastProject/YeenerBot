@@ -1781,7 +1781,8 @@ class ModerationHandler():
         warnings = json.loads(groupmember.warnings)
 
         try:
-            reason = '[MUTE] {}'.format(update.message.text.split(' ', 1)[1])
+            index = 2 if until_date else 1
+            reason = '[MUTE] {}'.format(update.message.text.split(' ', index)[index])
         except IndexError:
             reason = '[MUTE]'
 
@@ -1905,7 +1906,8 @@ class ModerationHandler():
             until_date = None
 
         try:
-            reason = '[BAN] {}'.format(update.message.text.split(' ', 1)[1])
+            index = 2 if until_date else 1
+            reason = '[BAN] {}'.format(update.message.text.split(' ', index)[index])
         except IndexError:
             reason = '[BAN]'
 
