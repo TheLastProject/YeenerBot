@@ -620,7 +620,7 @@ class Helpers():
                 # Older warnings don't have a link stored
                 continue
 
-            warningtext += "\n[{} UTC] warned by {} (reason: {}) {}".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "[{}]".format(link) if link else "")
+            warningtext += "\n[{} UTC] warned by {} (reason: {}) [{}{}]".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "{} ".format(link) if link else "", "#event{}".format(warning['timestamp']))
 
         return warningtext
 
@@ -1726,11 +1726,13 @@ class ModerationHandler():
         except IndexError:
             reason = None
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
+        timestamp = time.time()
+
+        warnings.append({'timestamp': timestamp, 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information.".format(message.from_user.name, len(warnings))
+        warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information. (Admin reference: #event{})".format(message.from_user.name, len(warnings), timestamp)
 
         bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
@@ -1786,7 +1788,9 @@ class ModerationHandler():
         except IndexError:
             reason = '[MUTE]'
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
+        timestamp = time.time()
+
+        warnings.append({'timestamp': timestamp, 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
@@ -1806,7 +1810,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}).".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", timestamp), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
@@ -1855,7 +1859,9 @@ class ModerationHandler():
         except IndexError:
             reason = '[KICK]'
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
+        timestamp = time.time()
+
+        warnings.append({'timestamp': timestamp, 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
@@ -1876,7 +1882,7 @@ class ModerationHandler():
             return
 
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}. (Admin reference: #event{})".format(message.from_user.name, timestamp), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
@@ -1911,7 +1917,9 @@ class ModerationHandler():
         except IndexError:
             reason = '[BAN]'
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
+        timestamp = time.time()
+
+        warnings.append({'timestamp': timestamp, 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
@@ -1931,7 +1939,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to ban anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}).".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", timestamp), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
