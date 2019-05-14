@@ -618,7 +618,7 @@ class Helpers():
                 link = warning['link']
             except KeyError:
                 # Older warnings don't have a link stored
-                continue
+                pass
 
             warningtext += "\n[{} UTC] warned by {} (reason: {}) [{}{}]".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "{} ".format(link) if link else "", "#event{}".format(ceil(warning['timestamp'])))
 
