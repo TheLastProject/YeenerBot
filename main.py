@@ -1656,7 +1656,6 @@ class ModerationHandler():
 
         bot.send_message(chat_id=update.message.from_user.id, text=audittext)
 
-
     @staticmethod
     @run_async
     @retry
@@ -1683,7 +1682,14 @@ class ModerationHandler():
                 # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
                 continue
 
-            warningtext += "\n[{} UTC] warned by {} (reason: {})".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
+            link = None
+            try:
+                link = warning['link']
+            except KeyError:
+                # Older warnings don't have a link stored
+                continue
+
+            warningtext += "\n[{} UTC] warned by {} (reason: {}) {}".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "[{}]".format(link) if link else "")
 
         bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
@@ -1710,19 +1716,11 @@ class ModerationHandler():
         except IndexError:
             reason = None
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        warningtext = "{}, you just received a warning. Here are all warnings since you joined:\n".format(message.from_user.name)
-        for warning in reversed(warnings):
-            try:
-                warnedby = update.message.chat.get_member(warning['warnedby'])
-            except TelegramError:
-                # If we can't find the warner in the chat anymore, assume they're no longer a mod and the warning is invalid.
-                continue
-
-            warningtext += "\n[{} UTC] warned by {} (reason: {})".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given")
+        warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information.".format(message.from_user.name, len(warnings))
 
         bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
@@ -1770,7 +1768,7 @@ class ModerationHandler():
         except IndexError:
             reason = '[MUTE]'
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
@@ -1790,7 +1788,9 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}).".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
+        link = message.link
+
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}) {}.".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", "[{}]".format(link) if link else ""), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1831,7 +1831,7 @@ class ModerationHandler():
         except IndexError:
             reason = '[KICK]'
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
@@ -1879,7 +1879,7 @@ class ModerationHandler():
         except IndexError:
             reason = '[BAN]'
 
-        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id})
+        warnings.append({'timestamp': time.time(), 'reason': reason, 'warnedby': update.message.from_user.id, 'link': message.link})
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
