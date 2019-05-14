@@ -1736,12 +1736,10 @@ class ModerationHandler():
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
-            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
             warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
 
             bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
-
 
     @staticmethod
     @run_async
@@ -1811,7 +1809,6 @@ class ModerationHandler():
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
-            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
             warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
 
@@ -1882,7 +1879,6 @@ class ModerationHandler():
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
-            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
             warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
 
@@ -1937,7 +1933,6 @@ class ModerationHandler():
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
-            groupmember = GroupMember(update.message.chat.id, update.message.reply_to_message.from_user.id)
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
             warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
 
