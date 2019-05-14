@@ -1806,7 +1806,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}) {}.".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}).".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never"), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
