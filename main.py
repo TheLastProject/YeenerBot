@@ -620,7 +620,7 @@ class Helpers():
                 # Older warnings don't have a link stored
                 continue
 
-            warningtext += "\n[{} UTC] warned by {} (reason: {}) [{}{}]".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "{} ".format(link) if link else "", "#event{}".format(warning['timestamp']))
+            warningtext += "\n[{} UTC] warned by {} (reason: {}) [{}{}]".format(str(datetime.datetime.utcfromtimestamp(warning['timestamp'])).split(".")[0], warnedby.user.name, warning['reason'] if warning['reason'] else "none given", "{} ".format(link) if link else "", "#event{}".format(ceil(warning['timestamp'])))
 
         return warningtext
 
@@ -1732,7 +1732,7 @@ class ModerationHandler():
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information. (Admin reference: #event{})".format(message.from_user.name, len(warnings), timestamp)
+        warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information. (Admin reference: #event{})".format(message.from_user.name, len(warnings), ceil(timestamp))
 
         bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
@@ -1810,7 +1810,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", timestamp), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", ceil(timestamp)), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
@@ -1882,7 +1882,7 @@ class ModerationHandler():
             return
 
         bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}. (Admin reference: #event{})".format(message.from_user.name, timestamp), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}. (Admin reference: #event{})".format(message.from_user.name, ceil(timestamp)), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
@@ -1939,7 +1939,7 @@ class ModerationHandler():
                 bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to ban anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", timestamp), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", ceil(timestamp)), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
