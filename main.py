@@ -1699,7 +1699,7 @@ class ModerationHandler():
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
-        warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+        warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
 
         bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
@@ -1737,7 +1737,7 @@ class ModerationHandler():
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
 
             bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
@@ -1810,7 +1810,7 @@ class ModerationHandler():
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
 
             bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
@@ -1880,7 +1880,7 @@ class ModerationHandler():
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
 
             bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
@@ -1934,7 +1934,7 @@ class ModerationHandler():
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat.id, warnings)
+            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
 
             bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
