@@ -1774,8 +1774,13 @@ class ModerationHandler():
 
         try:
             # min 1 minute, max 1 year, other things are considered permanent by Telegram
-            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
+            duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
         except IndexError:
+            duration = 0
+
+        if duration > 0:
+            until_date = time.time() + duration
+        else:
             until_date = None
 
         message = update.message.reply_to_message
@@ -1907,8 +1912,13 @@ class ModerationHandler():
 
         try:
             # min 1 minute, max 1 year, other things are considered permanent by Telegram
-            until_date = time.time() + Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
+            duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
         except IndexError:
+            duration = 0
+
+        if duration > 0:
+            until_date = time.time() + duration
+        else:
             until_date = None
 
         try:
