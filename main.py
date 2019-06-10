@@ -993,7 +993,7 @@ class GreetingHandler():
         group.forceruleread_timeout = duration
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read timeout: {} minutes (dependency force rule read: {}, welcome: {}, dependency rules set: {})".format(str(duration / 60), group.forceruleread_enabled, 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
+        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read timeout: {} minutes (dependency force rule read: {}, welcome: {}, dependency rules set: {})".format(str(duration / 60), bool(strtobool(str(group.forceruleread_enabled))), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
 
 
     @staticmethod
