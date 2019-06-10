@@ -388,13 +388,13 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, forceruleread_timeout=1800, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
+    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, forceruleread_timeout=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
         self.group_id = group_id
         self.enabled_features = enabled_features if enabled_features is not None else json.dumps([])
         self.disabled_features = disabled_features if disabled_features is not None else json.dumps([])
         self.welcome_message = welcome_message
         self.forceruleread_enabled = forceruleread_enabled
-        self.forceruleread_timeout = forceruleread_timeout
+        self.forceruleread_timeout = forceruleread_timeout if forceruleread_timeout is not None else 1800
         self.description = description
         self.rules = rules
         self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
@@ -985,8 +985,8 @@ class GreetingHandler():
         group = DB.get_group(update.message.chat.id)
 
         try:
-            # min 1 minute, max 1 week
-            duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=10080)
+            # max 1 week
+            duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], max_duration=10080)
         except (IndexError, ValueError):
             bot.send_message(chat_id=update.effective_chat.id, text="Current timeout: {} minutes. Please specify a timeout to change.".format(str(group.forceruleread_timeout / 60)), reply_to_message_id=update.message.message_id)
             return
