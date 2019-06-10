@@ -1037,7 +1037,7 @@ class GreetingHandler():
                 if not memberinfo.readrules and member.status == 'member':
                     bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, can_send_messages=False)
                     if group.forceruleread_timeout > 0:
-                        t = threading.Timer(group.forceruleread_timeout, GreetingHandler.kick_if_rule_read_failed, bot, group, member)
+                        t = threading.Timer(group.forceruleread_timeout, GreetingHandler.kick_if_rule_read_failed, [bot, group, member])
                         t.daemon = True
                         t.start()
 
