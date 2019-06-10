@@ -90,8 +90,9 @@ def retry(function):
         for i in range(1, 3):
             try:
                 return function(bot=bot, update=update, **optional_args)
-            except Exception:
-                pass
+            except Exception as e:
+                print(e)
+                traceback.print_exc()
 
             time.sleep(i)
 
