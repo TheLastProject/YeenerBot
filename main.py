@@ -15,6 +15,7 @@ import json
 import logging
 import random
 import re
+import threading
 import time
 import traceback
 
@@ -386,12 +387,13 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
+    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, forceruleread_timeout=1800, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
         self.group_id = group_id
         self.enabled_features = enabled_features if enabled_features is not None else json.dumps([])
         self.disabled_features = disabled_features if disabled_features is not None else json.dumps([])
         self.welcome_message = welcome_message
         self.forceruleread_enabled = forceruleread_enabled
+        self.forceruleread_timeout = forceruleread_timeout
         self.description = description
         self.rules = rules
         self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
@@ -425,7 +427,7 @@ class Group():
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'enabled_features', 'disabled_features', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
+        return ['group_id', 'enabled_features', 'disabled_features', 'welcome_message', 'forceruleread_enabled', 'forceruleread_timeout', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
 
     @staticmethod
     def get_types():
@@ -434,6 +436,7 @@ class Group():
                 'disabled_features': sqlalchemy.types.Text,
                 'welcome_message': sqlalchemy.types.Text,
                 'forceruleread_enabled': sqlalchemy.types.Boolean,
+                'forceruleread_timeout': sqlalchemy.types.Integer,
                 'description': sqlalchemy.types.Text,
                 'rules': sqlalchemy.types.Text,
                 'relatedchat_ids': sqlalchemy.types.Text,
@@ -882,6 +885,7 @@ class GreetingHandler():
         clearwelcome_handler = CommandHandler('clearwelcome', GreetingHandler.clear_welcome)
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
         toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
+        toggleforcerulereadtimeout_handler = CommandHandler('toggleforcerulereadtimeout', GreetingHandler.toggle_forcerulereadtimeout)
         dispatcher.add_handler(start_handler, group=1)
         dispatcher.add_handler(created_handler, group=1)
         dispatcher.add_handler(migrated_handler, group=1)
@@ -889,6 +893,20 @@ class GreetingHandler():
         dispatcher.add_handler(clearwelcome_handler, group=1)
         dispatcher.add_handler(setwelcome_handler, group=1)
         dispatcher.add_handler(toggleforceruleread_handler, group=1)
+        dispatcher.add_handler(toggleforcerulereadtimeout_handler, group=1)
+
+    @staticmethod
+    @retry
+    def kick_if_rule_read_failed(bot, group, member):
+        # Check if forceruleread is still enabled
+        if not group.forceruleread_enabled:
+            return
+
+        # Check if the member read the rules
+        memberinfo = DB.get_groupmember(group.chat_id, member.user.id)
+        if not memberinfo.readrules:
+            bot.send_message(chat_id=group.chat_id, text="I'm kicking {} for not reading the rules in time.".format(member.user.name))
+            bot.kick_chat_member(chat_id=group.chat_id, user_id=member.user.id)
 
     @staticmethod
     @run_async
@@ -932,7 +950,7 @@ class GreetingHandler():
             group.welcome_message = update.message.text.split(' ', 1)[1]
             group.save()
         except IndexError:
-            text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome Hello {{ user.name }}! Welcome to {{ chat.title }}! {% if group.rules and group.forceruleread_enabled and not memberinfo.readrules %}This group requires new members to read the rules before they can send messages. {% endif %}{% if group.rules %}Please make sure to read the /rules by pressing the button below.{% endif %}"
+            text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome {% if not memberinfo.readrules %}Hello {{ user.name }} and welcome to {{ chat.title }}.{% if group.rules %}{% if group.forceruleread_enabled %} This group requires new members to read the rules before they can send messages.{% if group.forceruleread_timeout > 0 %} You have {{ group.forceruleread_timeout / 60 }} minutes to read the rules.{% endif %}{% endif %} Please make sure to read the /rules by clicking the button below and pressing start.{% endif %}{% else %}Welcome back to {{ chat.title }}, {{ user.name }}!{% endif %}"
 
         bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
@@ -955,6 +973,28 @@ class GreetingHandler():
         group.save()
 
         bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
+
+    @staticmethod
+    @run_async
+    @retry
+    @busy_indicator
+    @resolve_chat
+    @ensure_admin
+    def toggle_forcerulereadtimeout(bot, update):
+        group = DB.get_group(update.message.chat.id)
+
+        try:
+            # min 1 minute, max 1 week
+            duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=10080)
+        except (IndexError, ValueError):
+            bot.send_message(chat_id=update.effective_chat.id, text="Current timeout: {} minutes. Please specify a timeout to change.".format(str(group.forceruleread_timeout / 60)), reply_to_message_id=update.message.message_id)
+            return
+
+        group.forceruleread_timeout = duration
+        group.save()
+
+        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read timeout: {} minutes (dependency force rule read: {}, welcome: {}, dependency rules set: {})".format(str(duration / 60), group.forceruleread_enabled, 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
+
 
     @staticmethod
     @run_async
@@ -986,7 +1026,7 @@ class GreetingHandler():
         if group.welcome_message:
             text = group.welcome_message
         else:
-            text = "{% if not memberinfo.readrules %}Hello {{ user.name }} and welcome to {{ chat.title }}.{% if group.rules %}{% if group.forceruleread_enabled %} This group requires new members to read the rules before they can send messages.{% endif %} Please make sure to read the /rules by clicking the button below and pressing start.{% endif %}{% else %}Welcome back to {{ chat.title }}, {{ user.name }}!{% endif %}"
+            text = "{% if not memberinfo.readrules %}Hello {{ user.name }} and welcome to {{ chat.title }}.{% if group.rules %}{% if group.forceruleread_enabled %} This group requires new members to read the rules before they can send messages.{% if group.forceruleread_timeout > 0 %} You have {{ group.forceruleread_timeout / 60 }} minutes to read the rules.{% endif %}{% endif %} Please make sure to read the /rules by clicking the button below and pressing start.{% endif %}{% else %}Welcome back to {{ chat.title }}, {{ user.name }}!{% endif %}"
 
         keyboard = None
         if group.rules:
@@ -1007,6 +1047,11 @@ class GreetingHandler():
             if group.rules and group.forceruleread_enabled:
                 if not memberinfo.readrules and member.status == 'member':
                     bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, can_send_messages=False)
+                    if group.forceruleread_timeout > 0:
+                        t = threading.Timer(group.forceruleread_timeout, GreetingHandler.kick_if_rule_read_failed, bot, group, member)
+                        t.daemon = True
+                        t.start()
+
 
 
 class GroupStateHandler():
