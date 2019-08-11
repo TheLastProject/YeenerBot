@@ -100,6 +100,8 @@ def retry(function):
         try:
             return function(bot=bot, update=update, **optional_args)
         except TelegramError as error:
+            print(error)
+            traceback.print_exc()
             return ErrorHandler.handle_error(bot=bot, update=update, error=error)
         except Exception as e:
             print(e)
