@@ -1789,7 +1789,12 @@ class ModerationHandler():
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
             warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
 
-            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+            try:
+                bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+            except TelegramError as e:
+                if (e.message == "Chat not found"):
+                    group.controlchannel_id = None
+                    group.save()
 
     @staticmethod
     @run_async
