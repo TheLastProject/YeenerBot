@@ -160,7 +160,12 @@ def ensure_admin(function):
             group.save()
             if group.controlchannel_id:
                 audittext = "[{} UTC] {}{}: {}".format(str(datetime.datetime.utcfromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(update.message.reply_to_message.from_user.name) if update.message.reply_to_message else "", auditlog[-1]['command'])
+            try:
                 bot.send_message(chat_id=group.controlchannel_id, text="{}\n\n{}".format(update.message.chat.title, audittext))
+            except TelegramError as e:
+                if (e.message == "Chat not found"):
+                    group.controlchannel_id = None
+                    group.save()
 
         return function(bot=bot, update=update, **optional_args)
 
