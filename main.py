@@ -268,7 +268,7 @@ class SupportsFilter():
 
 
 class DB():
-    __db = dataset.connect('{}://{}:{}@{}/{}'.format(db_type.lower(), db_username, db_password, db_host, db_name), engine_kwargs={'pool_pre_ping': True})
+    __db = dataset.connect('{}://{}:{}@{}/{}?charset=utf8mb'.format(db_type.lower(), db_username, db_password, db_host, db_name), engine_kwargs={'pool_pre_ping': True})
     __group_table = __db['group']
     __user_table = __db['user']
     __groupmember_table = __db['groupmember']
