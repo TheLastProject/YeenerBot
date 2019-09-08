@@ -205,7 +205,11 @@ def resolve_chat(function):
                 if chat.id == update.message.chat_id:
                     continue
 
-                if not superadmin and not chat.get_member(user.id).status in ['creator', 'administrator', 'member']:
+                acceptable_statuses = ['creator', 'administrator', 'member']
+                # Even restricted members should be able to request the rules
+                if update.message.text == '/rules' or update.message.text.startswith('/rules@'):
+                    acceptable_statuses.append('restricted')
+                if not superadmin and not chat.get_member(user.id).status in acceptable_statuses:
                     continue
 
                 chats.append(chat)
