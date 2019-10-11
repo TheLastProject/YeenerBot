@@ -138,6 +138,15 @@ def busy_indicator(function):
         return function(bot=bot, update=update, **optional_args)
     return wrapper
 
+def busy_indicator_user(function):
+    def wrapper(bot, update, **optional_args):
+        try:
+            bot.send_chat_action(update.message.from_user.id, ChatAction.TYPING)
+        except Exception:
+            pass
+        return function(bot=bot, update=update, **optional_args)
+    return wrapper
+
 def ensure_admin(function):
     def wrapper(bot, update, **optional_args):
         member = update.message.chat.get_member(update.message.from_user.id)
@@ -1092,7 +1101,7 @@ class GroupStateHandler():
     @staticmethod
     @run_async
     @retry
-    @busy_indicator
+    @busy_indicator_user
     @resolve_chat
     def relatedchats(bot, update):
         group = DB.get_group(update.message.chat.id)
@@ -1278,7 +1287,7 @@ class GroupStateHandler():
     @staticmethod
     @run_async
     @retry
-    @busy_indicator
+    @busy_indicator_user
     @resolve_chat
     def description(bot, update):
         group = DB.get_group(update.message.chat.id)
@@ -1611,7 +1620,7 @@ class RuleHandler():
     @staticmethod
     @run_async
     @retry
-    @busy_indicator
+    @busy_indicator_user
     @resolve_chat
     def send_rules(bot, update):
         group = DB.get_group(update.message.chat.id)
@@ -1705,7 +1714,7 @@ class ModerationHandler():
     @staticmethod
     @run_async
     @retry
-    @busy_indicator
+    @busy_indicator_user
     @resolve_chat
     @ensure_admin
     def auditlog(bot, update):
