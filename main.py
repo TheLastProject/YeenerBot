@@ -13,6 +13,7 @@ import datetime
 import io
 import json
 import logging
+import os
 import random
 import re
 import threading
@@ -40,28 +41,40 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 cache = TTLCache(maxsize=100, ttl=600)
 
+
+def get_config_value(configs, section, option):
+    env_name = section + "_" + option
+    env_name = env_name.upper()
+    result = None
+    if env_name in os.environ:
+        result = os.getenv(env_name)
+    elif configs.has_option(section, option):
+        result = configs.get(section, option)
+    return result
+
 # Config parsing
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+config_superadmins = get_config_value(config, 'GENERAL', 'Superadmins')
 try:
-    superadmins = [int(superadmin) for superadmin in config.get('GENERAL', 'Superadmins', fallback="").split(" ")]
+    superadmins = [int(superadmin) for superadmin in config_superadmins.split(" ")]
 except Exception:
     print("No superadmins found or failed to parse the list. Continuing as normal.")
     superadmins = []
 
-if not config.has_option('TOKENS', 'Telegram'):
-    print("No Telegram token set in config.ini. Cannot continue.")
+token = get_config_value(config, 'TOKENS', 'Telegram')
+if token is None:
+    print("No Telegram token set in config.ini or environment variables. Cannot continue.")
     exit(1)
 
-token = config['TOKENS']['Telegram']
 saucenao_token = config.get('TOKENS', 'SauceNao', fallback=None)
 
-db_type = config['DATABASE']['Type']
-db_host = config['DATABASE']['Host']
-db_username = config['DATABASE']['Username']
-db_password = config['DATABASE']['Password']
-db_name = config['DATABASE']['Name']
+db_type = get_config_value(config, 'DATABASE', 'Type')
+db_host = get_config_value(config, 'DATABASE', 'Host')
+db_username = get_config_value(config, 'DATABASE', 'Username')
+db_password = get_config_value(config, 'DATABASE', 'Password')
+db_name = get_config_value(config, 'DATABASE', 'Name')
 
 def feature(feature_name):
     def real_feature(function):
