@@ -1,0 +1,45 @@
+version: '3'
+services:
+  yeener-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yeener-bot
+    environment:
+      # Optional, space-separated list of Telegram user IDs that are seen as "admins" in every chat the bot is in.
+      # Get them from @userinfobot for example.
+      # ADVANCED FEATURE! USE WITH CARE! Probably just want to leave it empty!
+      #GENERAL_SUPERADMINS:
+
+      # Telegram token, necessary for obvious reasons. See https://core.telegram.org/bots#6-botfather
+      TOKENS_TELEGRAM:
+
+      # Optional, used for /source function. Create an account on https://saucenao.com/ for a key.
+      #TOKENS_SAUCENAO:
+
+      DATABASE_TYPE: # MySQL / PostgresQL
+      DATABASE_USERNAME: # root / postgres
+      DATABASE_PASSWORD:
+      DATABASE_HOST: db
+      DATABASE_NAME: YeenerBot
+
+# Uncomment this for MySQL
+#  db:
+#    image: "mysql:latest"
+#    command: --default-authentication-plugin=mysql_native_password
+#    restart: always
+#    volumes:
+#      - /custom/path/to/mysql:/var/lib/mysql # replace the path
+#    environment:
+#      MYSQL_ROOT_PASSWORD:
+#      MYSQL_DATABASE: YeenerBot
+
+# Uncomment this for PostgreSQL
+#  db:
+#    image: postgres:alpine
+#    restart: always
+#    volumes:
+#      - /custom/path/to/data:/var/lib/postgresql/data # replace the path
+#    environment:
+#      POSTGRES_PASSWORD: example
+#      POSTGRES_DB: YeenerBot
