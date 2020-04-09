@@ -31,7 +31,7 @@ import sqlalchemy
 
 from cachetools import cached, TTLCache
 from jinja2.sandbox import ImmutableSandboxedEnvironment
-from telegram import ChatAction, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
+from telegram import ChatAction, ChatPermissions, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import BadRequest, Unauthorized, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
 from telegram.ext.dispatcher import run_async
@@ -1080,7 +1080,7 @@ class GreetingHandler():
 
             if group.rules and group.forceruleread_enabled:
                 if not memberinfo.readrules and member.status == 'member':
-                    bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, can_send_messages=False)
+                    bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, permissions=ChatPermissions(can_send_messages=False))
                     if group.forceruleread_timeout > 0:
                         t = threading.Timer(group.forceruleread_timeout, GreetingHandler.kick_if_rule_read_failed, args=[bot, group, member])
                         t.daemon = True
@@ -1656,7 +1656,7 @@ class RuleHandler():
         if not groupmember.readrules:
             member = update.message.chat.get_member(update.message.from_user.id)
             if member.status == 'restricted':
-                bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
+                bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
 
             groupmember.readrules = True
             groupmember.save()
@@ -1898,7 +1898,7 @@ class ModerationHandler():
         groupmember.save()
 
         try:
-            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date, can_send_messages=False)
+            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date, permissions=ChatPermissions(can_send_messages=False))
         except (BadRequest, Unauthorized):
             chat = CachedBot.get_chat(bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
@@ -1936,7 +1936,7 @@ class ModerationHandler():
         message = update.message.reply_to_message
 
         try:
-            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
+            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
         except (BadRequest, Unauthorized):
             bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to unmute this person.", reply_to_message_id=update.message.message_id)
             return
