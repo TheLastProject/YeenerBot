@@ -68,7 +68,7 @@ if token is None:
     print("No Telegram token set in config.ini or environment variables. Cannot continue.")
     exit(1)
 
-saucenao_token = config.get('TOKENS', 'SauceNao', fallback=None)
+saucenao_token = get_config_value(config, 'TOKENS', 'SauceNao')
 
 db_type = get_config_value(config, 'DATABASE', 'Type')
 db_host = get_config_value(config, 'DATABASE', 'Host')
