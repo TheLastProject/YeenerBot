@@ -1412,35 +1412,45 @@ class RandomHandler():
             return
 
         for section in sections:
-            diceparts = section.split('d')
-            if len(diceparts) == 1:
-                if diceparts[0].strip() == "":
-                    count = 1
-                    faces = 20
-                else:
-                    try:
-                        value = int(diceparts[0])
-                    except ValueError:
-                        results.append({'description': '{} (invalid)'.format(diceparts[0]), 'values': [], 'total': 0})
-                        continue
-
-                    results.append({'description': str(value), 'values': [value], 'total': value})
+            # Check if this is a standalone number
+            if 'd' not in section:
+                try:
+                    value = int(section)
+                except ValueError:
+                    results.append({'description': '{} (invalid)'.format(section), 'values': [], 'total': 0})
                     continue
+
+                results.append({'description': str(value), 'values': [value], 'total': value})
+                continue
+
+            # Parse as xdy
+            negative = section.startswith("-")
+            if negative:
+                section = section[1:]
+
+            diceparts = section.split('d')
+            if diceparts[0] == "":
+                count = 1
             else:
                 try:
                     count = int(diceparts[0])
                 except ValueError:
-                    count = 1
+                    results.append({'description': '{} (invalid)'.format(section), 'values': [], 'total': 0})
+                    continue
 
+            if diceparts[1] == "":
+                faces = 20
+            else:
                 try:
                     faces = int(diceparts[1])
                 except ValueError:
-                    faces = 20
+                    results.append({'description': '{} (invalid)'.format(section), 'values': [], 'total': 0})
+                    continue
 
-            dice = '{}d{}'.format(count, faces)
+            dice = '{}{}d{}'.format("-" if negative else "", count, faces)
 
             if count < 1 or faces < 1:
-                results.append({'description': '{} (invalid)'.format(dice), 'values': [], 'total': 0})
+                results.append({'description': dice, 'values': [], 'total': 0})
                 continue
             elif count > 99 or faces > 99:
                 results.append({'description': '{} (too big)'.format(dice), 'values': [], 'total': 0})
@@ -1451,10 +1461,14 @@ class RandomHandler():
             for _ in range(0, count):
                 roll_result = random.randint(1, faces)
                 values.append(roll_result)
-                total += roll_result
+                if negative:
+                    total -= roll_result
+                else:
+                    total += roll_result
 
-            results.append({'description': '{}d{}'.format(count, faces), 'values': values, 'total': total})
+            results.append({'description': dice, 'values': values, 'total': total})
 
+        # Put it all together
         total_total = 0
         text = ""
         for result in results:
