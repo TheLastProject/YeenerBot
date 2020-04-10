@@ -33,7 +33,7 @@ from cachetools import cached, TTLCache
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ChatPermissions, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import BadRequest, Unauthorized, TelegramError
-from telegram.ext import CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
+from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
 from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -78,31 +78,31 @@ db_name = get_config_value(config, 'DATABASE', 'Name')
 
 def feature(feature_name):
     def real_feature(function):
-        def wrapper(bot, update, **optional_args):
+        def wrapper(update: Update, context: CallbackContext, **optional_args):
             if update.message.chat.type == 'private':
-                return function(bot=bot, update=update, **optional_args)
+                return function(update=update, context=context, **optional_args)
 
             group = DB.get_group(update.message.chat.id)
             if feature_name in group.get_enabled_features():
-                return function(bot=bot, update=update, **optional_args)
+                return function(update=update, context=context, **optional_args)
             else:
                 member = update.message.chat.get_member(update.message.from_user.id)
                 if member.status in ['creator', 'administrator']:
-                    bot.send_message(chat_id=update.effective_chat.id, text="Feature {} is disabled, but caller is an administrator, allowing anyway...".format(feature_name), reply_to_message_id=update.message.message_id)
-                    return function(bot=bot, update=update, **optional_args)
+                    context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} is disabled, but caller is an administrator, allowing anyway...".format(feature_name), reply_to_message_id=update.message.message_id)
+                    return function(update=update, context=context, **optional_args)
 
-            bot.send_message(chat_id=update.effective_chat.id, text="Sorry, but this feature ({}) is disabled in this chat".format(feature_name), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, but this feature ({}) is disabled in this chat".format(feature_name), reply_to_message_id=update.message.message_id)
 
             return
         return wrapper
     return real_feature
 
 def retry(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         # Try 3 times
         for i in range(1, 3):
             try:
-                return function(bot=bot, update=update, **optional_args)
+                return function(update=update, context=context, **optional_args)
             except Exception as e:
                 print(e)
                 traceback.print_exc()
@@ -111,20 +111,14 @@ def retry(function):
 
         # Final try
         try:
-            return function(bot=bot, update=update, **optional_args)
-        except TelegramError as error:
-            print(error)
-            traceback.print_exc()
-            return ErrorHandler.handle_error(bot=bot, update=update, error=error)
+            return function(update=update, context=context, **optional_args)
         except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return ErrorHandler.handle_error(bot=bot, update=update, error="Something went wrong")
+            return ErrorHandler.handle_error(update=update, context=context)
 
     return wrapper
 
 def rate_limited(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         if update.message.chat.type != 'private':
             group = DB.get_group(update.message.chat.id)
             if group.commandratelimit:
@@ -133,44 +127,44 @@ def rate_limited(function):
                 if timediff < group.commandratelimit:
                     member = update.message.chat.get_member(update.message.from_user.id)
                     if member.status not in ['creator', 'administrator']:
-                        bot.send_message(chat_id=update.effective_chat.id, text="You're too spammy. Try again in {} seconds".format(ceil(group.commandratelimit - timediff)), reply_to_message_id=update.message.message_id)
+                        context.bot.send_message(chat_id=update.effective_chat.id, text="You're too spammy. Try again in {} seconds".format(ceil(group.commandratelimit - timediff)), reply_to_message_id=update.message.message_id)
                         return
 
                 group_member.lastcommandtime = ceil(time.time())
                 group_member.save()
 
-        return function(bot=bot, update=update, **optional_args)
+        return function(update=update, context=context, **optional_args)
     return wrapper
 
 def busy_indicator(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         try:
-            bot.send_chat_action(update.message.chat.id, ChatAction.TYPING)
+            context.bot.send_chat_action(update.message.chat.id, ChatAction.TYPING)
         except Exception:
             pass
-        return function(bot=bot, update=update, **optional_args)
+        return function(update=update, context=context, **optional_args)
     return wrapper
 
 def busy_indicator_user(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         try:
-            bot.send_chat_action(update.message.from_user.id, ChatAction.TYPING)
+            context.bot.send_chat_action(update.message.from_user.id, ChatAction.TYPING)
         except Exception:
             pass
-        return function(bot=bot, update=update, **optional_args)
+        return function(update=update, context=context, **optional_args)
     return wrapper
 
 def ensure_admin(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         member = update.message.chat.get_member(update.message.from_user.id)
         if member.status not in ['creator', 'administrator']:
             if update.message.from_user.id not in superadmins:
-                bot.send_message(chat_id=update.effective_chat.id, text="You do not have the required permission to do this.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="You do not have the required permission to do this.", reply_to_message_id=update.message.message_id)
                 return
 
             user = DB.get_user(update.message.from_user.id)
             if time.time() - user.sudo_time > 300:
-                bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="Permission denied. Are you root? (try /sudo).", reply_to_message_id=update.message.message_id)
                 return
 
         command = update.message.text.split(' ', 1)[0]
@@ -183,18 +177,18 @@ def ensure_admin(function):
             if group.controlchannel_id:
                 audittext = "[{} UTC] {}{}: {}".format(str(datetime.datetime.utcfromtimestamp(auditlog[-1]['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(update.message.reply_to_message.from_user.name) if update.message.reply_to_message else "", auditlog[-1]['command'])
                 try:
-                    bot.send_message(chat_id=group.controlchannel_id, text="{}\n\n{}".format(update.message.chat.title, audittext))
+                    context.bot.send_message(chat_id=group.controlchannel_id, text="{}\n\n{}".format(update.message.chat.title, audittext))
                 except TelegramError as e:
                     if (e.message == "Chat not found"):
                         group.controlchannel_id = None
                         group.save()
 
-        return function(bot=bot, update=update, **optional_args)
+        return function(update=update, context=context, **optional_args)
 
     return wrapper
 
 def resolve_chat(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         is_control_channel = False
         for group in DB.get_all_groups():
             if group.controlchannel_id == str(update.message.chat.id):
@@ -202,7 +196,7 @@ def resolve_chat(function):
                 break
 
         if not is_control_channel and update.message.chat.type != 'private':
-            return function(bot=bot, update=update, **optional_args)
+            return function(update=update, context=context, **optional_args)
 
         user = update.message.from_user
         chats = []
@@ -218,7 +212,7 @@ def resolve_chat(function):
                 if is_control_channel and group.controlchannel_id != str(update.message.chat.id):
                     continue
 
-                chat = CachedBot.get_chat(bot, group.group_id)
+                chat = CachedBot.get_chat(context.bot, group.group_id)
 
                 if chat.type == 'private':
                     DB.delete_group(group)
@@ -246,7 +240,7 @@ def resolve_chat(function):
                 message = "You are not in any chats relevant to this control channel."
             else:
                 message = "You are not in any chats known to me."
-            bot.send_message(chat_id=update.message.chat_id, text=message, reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, text=message, reply_to_message_id=update.message.message_id)
             return
 
         MessageCache.messages[update.message.chat.id] = update.message
@@ -254,25 +248,25 @@ def resolve_chat(function):
         for chat in chats:
             keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
         keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-        bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat_id, text="Execute {} on which chat?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
 
     return wrapper
 
 def requires_confirmation(function):
-    def wrapper(bot, update, **optional_args):
+    def wrapper(update: Update, context: CallbackContext, **optional_args):
         if update.message.text.split(' ')[-1] != '--yes-i-really-am-sure':
             cloned_message = deepcopy(update.message)
             cloned_message.text += " --yes-i-really-am-sure"
             MessageCache.messages[update.message.chat.id] = cloned_message
             yes_button = InlineKeyboardButton("Yes, I am sure", callback_data=update.message.chat.id)
             keyboard = InlineKeyboardMarkup([[yes_button]])
-            bot.send_message(chat_id=update.message.chat_id, text="Are you really sure you want to run '{}'?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, text="Are you really sure you want to run '{}'?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         # Remove really sure parameter
         update.message.text = ' '.join(update.message.text.split(' ')[:-1])
 
-        return function(bot=bot, update=update, **optional_args)
+        return function(update=update, context=context, **optional_args)
 
     return wrapper
 
@@ -533,20 +527,23 @@ class ErrorHandler():
         return message
 
     @staticmethod
-    def handle_error(bot, update, error):
+    def handle_error(update: Update, context: CallbackContext):
         if not update:
             return
 
         reply_to_message = update.message.message_id if update.message else None
 
-        if type(error) == Unauthorized and update.message:
-            text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))
-            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
-        elif type(error) == TelegramError:
-            text = "A Telegram error occured: {}".format(ErrorHandler.filter_tokens(str(error)))
-            bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
+        if type(context.error) == Unauthorized and update.message:
+            text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(context.bot.name[1:], update.message.chat.id))
+            context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
+            return
+        elif type(context.error) == TelegramError:
+            text = "A Telegram error occured: {}".format(ErrorHandler.filter_tokens(str(context.error)))
+            context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
         else:
-            bot.send_message(chat_id=update.effective_chat.id, text="I ran into an unexpected issue :(", reply_to_message_id=reply_to_message)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="I ran into an unexpected issue :(", reply_to_message_id=reply_to_message)
+
+        raise context.error
 
 
 class CachedBot():
@@ -664,7 +661,7 @@ class Helpers():
 
 class CallbackHandler():
     def __init__(self, dispatcher):
-        callback_handler = CallbackQueryHandler(CallbackHandler.handle_callback, pass_update_queue=True)
+        callback_handler = CallbackQueryHandler(CallbackHandler.handle_callback)
         message_handler = MessageHandler(Filters.private, CallbackHandler.handle_message)
         dispatcher.add_handler(callback_handler, group=1)
         dispatcher.add_handler(message_handler, 99999) # Lowest possible priority
@@ -673,7 +670,7 @@ class CallbackHandler():
     @run_async
     @retry
     @busy_indicator
-    def handle_callback(bot, update, update_queue):
+    def handle_callback(update: Update, context: CallbackContext):
         reply_to_message = update.callback_query.message.reply_to_message
 
         if '_' in update.callback_query.data:
@@ -708,7 +705,7 @@ class CallbackHandler():
                     if is_control_channel and group.controlchannel_id != str(update.callback_query.message.chat.id):
                         continue
 
-                    chat = CachedBot.get_chat(bot, group.group_id)
+                    chat = CachedBot.get_chat(context.bot, group.group_id)
 
                     if chat.type == 'private':
                         DB.delete_group(group)
@@ -730,13 +727,13 @@ class CallbackHandler():
 
                     continue
         else:
-            chats = [CachedBot.get_chat(bot, chat_id)]
+            chats = [CachedBot.get_chat(context.bot, chat_id)]
 
         for chat in chats:
-            message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=bot, reply_to_message=reply_to_message)
+            message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=context.bot, reply_to_message=reply_to_message)
             new_update = Update(update_id=-1, message=message)
             new_update._effective_chat = update.callback_query.message.chat  # I sure hope this won't break in a future version: https://github.com/python-telegram-bot/python-telegram-bot/blob/d4b5bd40a5545a238ebd63f7ffcc1811691526b0/telegram/update.py#L96<Paste>
-            update_queue.put(new_update)
+            context.update_queue.put(new_update)
 
         if reply_to_message:
             update.callback_query.answer(text='Executing {} on message'.format(command))
@@ -745,7 +742,7 @@ class CallbackHandler():
 
     @staticmethod
     @run_async
-    def handle_message(bot, update):
+    def handle_message(update: Update, context: CallbackContext):
         if update.update_id == -1:
             return
 
@@ -766,7 +763,7 @@ class CallbackHandler():
 
         MessageCache.messages[update.message.chat_id] = update.message
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('/{}'.format(command), callback_data='{}_/{}'.format(update.message.chat.id, command))] for command in supported_commands])
-        bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
 
 
 class DebugHandler():
@@ -779,8 +776,8 @@ class DebugHandler():
     @retry
     @busy_indicator
     @rate_limited
-    def ping(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
+    def ping(update: Update, context: CallbackContext):
+        context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Pong.",
             "Ha! I win.",
             "Damn, I missed!"
@@ -796,9 +793,9 @@ class SudoHandler():
     @run_async
     @retry
     @busy_indicator
-    def sudo(bot, update):
+    def sudo(update: Update, context: CallbackContext):
         if update.message.from_user.id not in superadmins:
-            bot.send_message(chat_id=update.message.chat_id, text="{} is not a superadmin. This incident will be reported.".format(update.message.from_user.name), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, text="{} is not a superadmin. This incident will be reported.".format(update.message.from_user.name), reply_to_message_id=update.message.message_id)
             print("{} ({}) tried to use sudo but was denied".format(update.message.from_user.name, update.message.from_user.id))
             return
 
@@ -806,7 +803,7 @@ class SudoHandler():
         user.sudo_time = time.time()
         user.save()
 
-        bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 300 seconds).", reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat_id, text="We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:\n\n#1) Respect the privacy of others.\n#2) Think before you type.\n#3) With great power comes great responsibility.\n\n(Superadmin activated for 300 seconds).", reply_to_message_id=update.message.message_id)
 
 class FeatureHandler():
     def __init__(self, dispatcher):
@@ -822,7 +819,7 @@ class FeatureHandler():
     @retry
     @busy_indicator
     @resolve_chat
-    def list_features(bot, update):
+    def list_features(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         enabled_features = group.get_enabled_features()
 
@@ -830,7 +827,7 @@ class FeatureHandler():
         for feature in sorted(Group.get_features()):
             text += "{}: {}\n".format(feature, 'enabled' if feature in enabled_features else 'disabled')
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -838,17 +835,17 @@ class FeatureHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def disable_feature(bot, update):
+    def disable_feature(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         try:
             feature = update.message.text.split(' ', 1)[1]
         except IndexError:
-            bot.send_message(chat_id=update.effective_chat.id, text="Please specify a feature to disable.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Please specify a feature to disable.", reply_to_message_id=update.message.message_id)
             return
 
         if feature not in Group.get_features():
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.".format(feature), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         try:
@@ -861,14 +858,14 @@ class FeatureHandler():
 
         disabled_features = json.loads(group.disabled_features)
         if feature in disabled_features:
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly disabled.".format(feature), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly disabled.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         disabled_features.append(feature)
         group.disabled_features = json.dumps(disabled_features)
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Feature {} disabled".format(feature), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} disabled".format(feature), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -876,17 +873,17 @@ class FeatureHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def enable_feature(bot, update):
+    def enable_feature(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         try:
             feature = update.message.text.split(' ', 1)[1]
         except IndexError:
-            bot.send_message(chat_id=update.effective_chat.id, text="Please specify a feature to enable.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Please specify a feature to enable.", reply_to_message_id=update.message.message_id)
             return
 
         if feature not in Group.get_features():
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.".format(feature), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} does not exist.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         try:
@@ -899,14 +896,14 @@ class FeatureHandler():
 
         enabled_features = json.loads(group.enabled_features)
         if feature in enabled_features:
-            bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly enabled.".format(feature), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} was already explicitly enabled.".format(feature), reply_to_message_id=update.message.message_id)
             return
 
         enabled_features.append(feature)
         group.enabled_features = json.dumps(enabled_features)
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Feature {} enabled".format(feature), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} enabled".format(feature), reply_to_message_id=update.message.message_id)
 
 
 
@@ -946,7 +943,7 @@ class GreetingHandler():
     @run_async
     @retry
     @busy_indicator
-    def start(bot, update):
+    def start(update: Update, context: CallbackContext):
         try:
             payload = update.message.text.split(' ', 1)[1]
         except IndexError:
@@ -954,10 +951,10 @@ class GreetingHandler():
 
         if payload.startswith('rules_'):
             chat_id = payload[len('rules_'):]
-            chat = CachedBot.get_chat(bot, chat_id)
+            chat = CachedBot.get_chat(context.bot, chat_id)
             # Could be cleaner
             update.message.chat = chat
-            RuleHandler.send_rules(bot, update)
+            RuleHandler.send_rules(update, context)
 
     @staticmethod
     @run_async
@@ -965,11 +962,11 @@ class GreetingHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def clear_welcome(bot, update):
+    def clear_welcome(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         group.welcome_message = None
         group.save()
-        bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.", reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -977,7 +974,7 @@ class GreetingHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def set_welcome(bot, update):
+    def set_welcome(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         text = "Welcome message set."
         try:
@@ -986,7 +983,7 @@ class GreetingHandler():
         except IndexError:
             text = "You need to give the welcome message in the same message.\n\nExample:\n/setwelcome {% if not memberinfo.readrules %}Hello {{ user.name }} and welcome to {{ chat.title }}.{% if group.rules %}{% if group.forceruleread_enabled %} This group requires new members to read the rules before they can send messages.{% if group.forceruleread_timeout > 0 %} You have {{ group.forceruleread_timeout / 60 }} minutes to read the rules.{% endif %}{% endif %} Please make sure to read the /rules by clicking the button below and pressing start.{% endif %}{% else %}Welcome back to {{ chat.title }}, {{ user.name }}!{% endif %}"
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -994,19 +991,19 @@ class GreetingHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def toggle_forceruleread(bot, update):
+    def toggle_forceruleread(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.forceruleread_enabled)))), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.forceruleread_enabled)))), reply_to_message_id=update.message.message_id)
             return
 
         group.forceruleread_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1014,30 +1011,30 @@ class GreetingHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def toggle_forcerulereadtimeout(bot, update):
+    def toggle_forcerulereadtimeout(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         try:
             # max 1 week
             duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], max_duration=10080)
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current timeout: {} minutes. Please specify a timeout to change.".format(str(group.forceruleread_timeout / 60)), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Current timeout: {} minutes. Please specify a timeout to change.".format(str(group.forceruleread_timeout / 60)), reply_to_message_id=update.message.message_id)
             return
 
         group.forceruleread_timeout = duration
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Force rule read timeout: {} minutes (dependency force rule read: {}, welcome: {}, dependency rules set: {})".format(str(duration / 60), bool(strtobool(str(group.forceruleread_enabled))), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Force rule read timeout: {} minutes (dependency force rule read: {}, welcome: {}, dependency rules set: {})".format(str(duration / 60), bool(strtobool(str(group.forceruleread_enabled))), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
 
 
     @staticmethod
     @run_async
-    def created(bot, update):
+    def created(update: Update, context: CallbackContext):
         DB.get_group(update.message.chat.id)  # ensure creation
 
     @staticmethod
     @run_async
-    def migrated(bot, update):
+    def migrated(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.migrate_from_chat_id)
         DB.migrate_group(group, update.message.migrate_to_chat_id)
 
@@ -1046,7 +1043,7 @@ class GreetingHandler():
     @retry
     @busy_indicator
     @feature('welcome')
-    def welcome(bot, update):
+    def welcome(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         # Don't welcome bots (or ourselves)
@@ -1055,7 +1052,7 @@ class GreetingHandler():
             return
 
         if group.revoke_invite_link_after_join:
-            bot.export_chat_invite_link(update.message.chat.id)
+            context.bot.export_chat_invite_link(update.message.chat.id)
 
         if group.welcome_message:
             text = group.welcome_message
@@ -1064,7 +1061,7 @@ class GreetingHandler():
 
         keyboard = None
         if group.rules:
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url='https://telegram.me/{}?start=rules_{}'.format(bot.name[1:], update.message.chat.id))]])
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('Click and press START to read the rules', url='https://telegram.me/{}?start=rules_{}'.format(context.bot.name[1:], update.message.chat.id))]])
 
         env = ImmutableSandboxedEnvironment()
         for member in members:
@@ -1074,15 +1071,15 @@ class GreetingHandler():
                 formatted_string = env.from_string(text).render({'member': member, 'user': member.user, 'group': group, 'memberinfo': memberinfo, 'chat': update.message.chat})
             except Exception as e:
                 formatted_string = e
-            bot.send_message(chat_id=update.message.chat_id,
+            context.bot.send_message(chat_id=update.message.chat_id,
                              text=formatted_string,
                              reply_markup=keyboard)
 
             if group.rules and group.forceruleread_enabled:
                 if not memberinfo.readrules and member.status == 'member':
-                    bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, permissions=ChatPermissions(can_send_messages=False))
+                    context.bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=member.user.id, permissions=ChatPermissions(can_send_messages=False))
                     if group.forceruleread_timeout > 0:
-                        t = threading.Timer(group.forceruleread_timeout, GreetingHandler.kick_if_rule_read_failed, args=[bot, group, member])
+                        t = threading.Timer(group.forceruleread_timeout, GreetingHandler.kick_if_rule_read_failed, args=[context.bot, group, member])
                         t.daemon = True
                         t.start()
 
@@ -1116,9 +1113,9 @@ class GroupStateHandler():
     @retry
     @busy_indicator_user
     @resolve_chat
-    def relatedchats(bot, update):
+    def relatedchats(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
-        relatedchats = Helpers.get_related_chats(bot, group)
+        relatedchats = Helpers.get_related_chats(context.bot, group)
         if relatedchats:
             message = "{}\n\nRelated chats:\n".format(update.message.chat.title)
             related_chats_text = []
@@ -1126,7 +1123,7 @@ class GroupStateHandler():
                 try:
                     group = DB.get_group(relatedchat.id)
                     try:
-                        description = Helpers.get_description(bot, relatedchat, group)
+                        description = Helpers.get_description(context.bot, relatedchat, group)
                     except TelegramError:
                         pass
 
@@ -1134,7 +1131,7 @@ class GroupStateHandler():
                         description = "No description"
 
                     try:
-                        invitelink = Helpers.get_invite_link(bot, relatedchat)
+                        invitelink = Helpers.get_invite_link(context.bot, relatedchat)
                     except TelegramError:
                         invitelink = "No invite link available"
 
@@ -1143,9 +1140,9 @@ class GroupStateHandler():
                     continue
 
             message += "\n----\n".join(related_chats_text)
-            bot.send_message(chat_id=update.message.from_user.id, text=message)
+            context.bot.send_message(chat_id=update.message.from_user.id, text=message)
         else:
-            bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1153,13 +1150,13 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def add_relatedchat(bot, update):
+    def add_relatedchat(update: Update, context: CallbackContext):
         chat_ids = update.message.text.split(' ')[1:]
         if len(chat_ids) == 0:
             chats = []
             for group in DB.get_all_groups():
                 try:
-                    chat = CachedBot.get_chat(bot, group.group_id)
+                    chat = CachedBot.get_chat(context.bot, group.group_id)
                     if chat.type == 'private':
                         DB.delete_group(group)
                         continue
@@ -1178,11 +1175,11 @@ class GroupStateHandler():
                     continue
 
             if len(chats) == 0:
-                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.", reply_to_message_id=update.message.message_id)
                 return
 
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/addrelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
-            bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a related chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Add which chat as a related chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         group = DB.get_group(update.message.chat.id)
@@ -1200,7 +1197,7 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def remove_relatedchat(bot, update):
+    def remove_relatedchat(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         relatedchat_ids = json.loads(group.relatedchat_ids)
         chat_ids = update.message.text.split(' ', 1)[1:]
@@ -1208,16 +1205,16 @@ class GroupStateHandler():
             chats = []
             for chat_id in relatedchat_ids:
                 try:
-                    chat = CachedBot.get_chat(bot, chat_id)
+                    chat = CachedBot.get_chat(context.bot, chat_id)
                     chats.append(chat)
                 except TelegramError:
                     continue
 
             if len(chats) > 0:
                 keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(chat.title, callback_data='{}_/removerelatedchat {}'.format(update.message.chat.id, chat.id))] for chat in chats])
-                bot.send_message(chat_id=update.effective_chat.id, text="Remove which chat from related chats?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="Remove which chat from related chats?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             else:
-                bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
             return
 
         for chat_id in chat_ids:
@@ -1235,14 +1232,14 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def controlchat(bot, update):
+    def controlchat(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
-            message = "{}\n\nControl chat:\n{}".format(update.message.chat.title, CachedBot.get_chat(bot, group.controlchannel_id).title)
+            message = "{}\n\nControl chat:\n{}".format(update.message.chat.title, CachedBot.get_chat(context.bot, group.controlchannel_id).title)
         else:
             message = "{}\n\nNo known control chat".format(update.message.chat.title)
 
-        bot.send_message(chat_id=update.effective_chat.id, text=message, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=message, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1250,13 +1247,13 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def set_controlchat(bot, update):
+    def set_controlchat(update: Update, context: CallbackContext):
         chat_id = update.message.text.split(' ')[1:]
         if len(chat_id) == 0:
             chats = []
             for group in DB.get_all_groups():
                 try:
-                    chat = CachedBot.get_chat(bot, group.group_id)
+                    chat = CachedBot.get_chat(context.bot, group.group_id)
                     if chat.type == 'private':
                         DB.delete_group(group)
                         continue
@@ -1276,22 +1273,22 @@ class GroupStateHandler():
                     continue
 
             if len(chats) == 0:
-                bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.effective_chat.id, text="Can't find any shared chats. Make sure I'm in the chat you want to link.", reply_to_message_id=update.message.message_id)
                 return
 
             keyboard_buttons = [InlineKeyboardButton("[REMOVE CONTROL CHAT]", callback_data='{}_/setcontrolchat -1'.format(update.message.chat.id))]
             for chat in chats:
                 keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data='{}_/setcontrolchat {}'.format(update.message.chat.id, chat.id)))
             keyboard = InlineKeyboardMarkup([keyboard_button] for keyboard_button in keyboard_buttons)
-            bot.send_message(chat_id=update.effective_chat.id, text="Set which chat as a control chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Set which chat as a control chat?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
             return
 
         group = DB.get_group(update.message.chat.id)
         if chat_id[0] == str(-1):
             group.controlchannel_id = None
         else:
-            if not CachedBot.get_chat(bot, chat_id[0]).get_member(update.message.from_user.id).status in ['creator', 'administrator']:
-                bot.send_message(chat_id=update.effective_chat.id, text="You need to be an admin in the chat you want to set as control chat.", reply_to_message_id=update.message.message_id)
+            if not CachedBot.get_chat(context.bot, chat_id[0]).get_member(update.message.from_user.id).status in ['creator', 'administrator']:
+                context.bot.send_message(chat_id=update.effective_chat.id, text="You need to be an admin in the chat you want to set as control chat.", reply_to_message_id=update.message.message_id)
                 return
 
             group.controlchannel_id = chat_id[0]
@@ -1302,13 +1299,13 @@ class GroupStateHandler():
     @retry
     @busy_indicator_user
     @resolve_chat
-    def description(bot, update):
+    def description(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
-        description = Helpers.get_description(bot, update.message.chat, group)
+        description = Helpers.get_description(context.bot, update.message.chat, group)
         if not description:
             description = "No description"
 
-        bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
+        context.bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
 
     @staticmethod
     @run_async
@@ -1316,7 +1313,7 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def set_description(bot, update):
+    def set_description(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         text = "Description set."
         try:
@@ -1327,7 +1324,7 @@ class GroupStateHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1335,13 +1332,13 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @feature('invitelink')
-    def invitelink(bot, update):
-        invite_link = Helpers.get_invite_link(bot, update.message.chat)
+    def invitelink(update: Update, context: CallbackContext):
+        invite_link = Helpers.get_invite_link(context.bot, update.message.chat)
         if not invite_link:
-            bot.send_message(chat_id=update.effective_chat.id, text="{} does not have an invite link".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="{} does not have an invite link".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1350,9 +1347,9 @@ class GroupStateHandler():
     @resolve_chat
     @ensure_admin
     @feature('invitelink')
-    def revokeinvitelink(bot, update):
-        bot.export_chat_invite_link(update.message.chat.id)
-        bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
+    def revokeinvitelink(update: Update, context: CallbackContext):
+        context.bot.export_chat_invite_link(update.message.chat.id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1360,7 +1357,7 @@ class GroupStateHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def set_commandratelimit(bot, update):
+    def set_commandratelimit(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         text = "Member can now only execute one fun command per {} seconds."
         try:
@@ -1371,7 +1368,7 @@ class GroupStateHandler():
 
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text.format(group.commandratelimit), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=text.format(group.commandratelimit), reply_to_message_id=update.message.message_id)
 
 
 class RandomHandler():
@@ -1393,7 +1390,7 @@ class RandomHandler():
     @busy_indicator
     @feature('roll')
     @rate_limited
-    def roll(bot, update):
+    def roll(update: Update, context: CallbackContext):
         results = []
 
         try:
@@ -1408,7 +1405,7 @@ class RandomHandler():
         roll = re.sub(r'(?<![+])-', '+-', roll)
         sections = roll.split('+')
         if len(sections) > 9:
-            bot.send_message(chat_id=update.message.chat_id, text="Slow your roll", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, text="Slow your roll", reply_to_message_id=update.message.message_id)
             return
 
         for section in sections:
@@ -1485,7 +1482,7 @@ class RandomHandler():
         if len(results) > 1:
             text += "[total]\n{}".format(total_total)
 
-        bot.send_message(chat_id=update.message.chat_id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat_id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1493,8 +1490,8 @@ class RandomHandler():
     @busy_indicator
     @feature('flip')
     @rate_limited
-    def flip(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
+    def flip(update: Update, context: CallbackContext):
+        context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choices([
             "Heads.",
             "Tails.",
             "The coin has landed sideways."
@@ -1506,8 +1503,8 @@ class RandomHandler():
     @busy_indicator
     @feature('shake')
     @rate_limited
-    def shake(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
+    def shake(update: Update, context: CallbackContext):
+        context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• {}</code>".format(random.choice([
             "It is certain.",
             "It is decidedly so.",
             "Without a doubt.",
@@ -1535,7 +1532,7 @@ class RandomHandler():
     @busy_indicator
     @feature('roulette')
     @rate_limited
-    def roulette(bot, update):
+    def roulette(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         # Go to next chamber
@@ -1547,7 +1544,7 @@ class RandomHandler():
 
         # Check if bullet is in chamber
         if group.bullet == group.chamber:
-            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *BOOM!* Your brain is now all over the wall behind you.</code>", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *BOOM!* Your brain is now all over the wall behind you.</code>", reply_to_message_id=update.message.message_id)
             group.bullet = random.randint(0,6)
             group.chamber = 5
             group.save()
@@ -1562,28 +1559,28 @@ class RandomHandler():
                     return
 
             try:
-                bot.send_message(chat_id=update.message.from_user.id, text=Helpers.get_invite_link(bot, update.message.chat))
+                context.bot.send_message(chat_id=update.message.from_user.id, text=Helpers.get_invite_link(context.bot, update.message.chat))
             except Unauthorized:
-                bot.send_message(chat_id=update.message.chat_id, text="{} doesn't let me PM them an invite link back in, so I won't kick. Boring!".format(update.message.from_user.name))
+                context.bot.send_message(chat_id=update.message.chat_id, text="{} doesn't let me PM them an invite link back in, so I won't kick. Boring!".format(update.message.from_user.name))
                 return
 
             try:
-                bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+                context.bot.kick_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
             except Unauthorized:
-                bot.send_message(chat_id=update.message.chat_id, text="Roulette kicking is enabled, but I don't have the rights to kick...")
+                context.bot.send_message(chat_id=update.message.chat_id, text="Roulette kicking is enabled, but I don't have the rights to kick...")
                 return
 
-            bot.send_message(chat_id=update.message.chat_id, text="{} is no longer among us.".format(update.message.from_user.name))
+            context.bot.send_message(chat_id=update.message.chat_id, text="{} is no longer among us.".format(update.message.from_user.name))
 
-            bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
+            context.bot.unban_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id)
         elif group.chamber == 5:
-            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click!* Oh, I forgot to load the gun...</code>", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click!* Oh, I forgot to load the gun...</code>", reply_to_message_id=update.message.message_id)
             group.bullet = random.randint(0,5)
             group.chamber = 5
             group.save()
         else:
             chambersremaining = 5 - group.chamber
-            bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1591,19 +1588,19 @@ class RandomHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def toggle_roulettekicks(bot, update):
+    def toggle_roulettekicks(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.roulettekicks_enabled)))), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.roulettekicks_enabled)))), reply_to_message_id=update.message.message_id)
             return
 
         group.roulettekicks_enabled = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Roulette kicks: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Roulette kicks: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
 
 class RuleHandler():
@@ -1621,11 +1618,11 @@ class RuleHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def clear_rules(bot, update):
+    def clear_rules(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         group.rules = None
         group.save()
-        bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.", reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -1633,7 +1630,7 @@ class RuleHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def set_rules(bot, update):
+    def set_rules(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         text = "Rules set."
         try:
@@ -1642,38 +1639,38 @@ class RuleHandler():
         except IndexError:
             text = "You need to give the rules in the same message.\n\nExample:\n/setrules The only rule is that there are no rules. Except this one."
 
-        bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
     @retry
     @busy_indicator_user
     @resolve_chat
-    def send_rules(bot, update):
+    def send_rules(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         groupmember = DB.get_groupmember(update.message.chat_id, update.message.from_user.id)
 
         if not groupmember.readrules:
             member = update.message.chat.get_member(update.message.from_user.id)
             if member.status == 'restricted':
-                bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
+                context.bot.restrict_chat_member(chat_id=update.message.chat_id, user_id=update.message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
 
             groupmember.readrules = True
             groupmember.save()
 
         if not group.rules:
-            bot.send_message(chat_id=update.effective_chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="No rules set for this group yet. Just don't be a meanie, okay?", reply_to_message_id=update.message.message_id)
             return
 
         text = "{}\n\n".format(update.message.chat.title)
-        description = Helpers.get_description(bot, update.message.chat, group)
+        description = Helpers.get_description(context.bot, update.message.chat, group)
         if description:
             text += "{}\n\n".format(description)
 
         text += "The group rules are:\n{}\n\n".format(group.rules)
         text += "Your mods are:\n{}".format("\n".join(Helpers.list_mods(update.message.chat)))
 
-        relatedchats = Helpers.get_related_chats(bot, group)
+        relatedchats = Helpers.get_related_chats(context.bot, group)
         if relatedchats:
             text += "\n\nRelated chats:\n"
             related_chats_text = []
@@ -1682,7 +1679,7 @@ class RuleHandler():
                     group = DB.get_group(relatedchat.id)
 
                     try:
-                        description = Helpers.get_description(bot, relatedchat, group)
+                        description = Helpers.get_description(context.bot, relatedchat, group)
                     except TelegramError:
                         pass
 
@@ -1690,7 +1687,7 @@ class RuleHandler():
                         description = "No description"
 
                     try:
-                        invitelink = Helpers.get_invite_link(bot, relatedchat)
+                        invitelink = Helpers.get_invite_link(context.bot, relatedchat)
                     except TelegramError:
                         invitelink = "No invite link available"
 
@@ -1700,7 +1697,7 @@ class RuleHandler():
 
             text += "\n----\n".join(related_chats_text)
 
-        bot.send_message(chat_id=update.message.from_user.id, text=text)
+        context.bot.send_message(chat_id=update.message.from_user.id, text=text)
 
 class ModerationHandler():
     def __init__(self, dispatcher):
@@ -1744,11 +1741,11 @@ class ModerationHandler():
     @busy_indicator_user
     @resolve_chat
     @ensure_admin
-    def auditlog(bot, update):
+    def auditlog(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
         auditlog = json.loads(group.auditlog)
         if len(auditlog) == 0:
-            bot.send_message(chat_id=update.message.from_user.id, text="No admin actions have been logged in this chat yet.")
+            context.bot.send_message(chat_id=update.message.from_user.id, text="No admin actions have been logged in this chat yet.")
             return
 
         audittext = "{} most recent admin events in {}:".format(len(auditlog), update.message.chat.title)
@@ -1771,7 +1768,7 @@ class ModerationHandler():
 
             audittext += "\n[{} UTC] {}{}: {}".format(str(datetime.datetime.utcfromtimestamp(auditentry['timestamp'])).split(".")[0], member.user.name, " (in reply to {})".format(auditentry['inreplyto']) if auditentry['inreplyto'] else "", auditentry['command'])
 
-        bot.send_message(chat_id=update.message.from_user.id, text=audittext)
+        context.bot.send_message(chat_id=update.message.from_user.id, text=audittext)
 
     @staticmethod
     @run_async
@@ -1779,7 +1776,7 @@ class ModerationHandler():
     @busy_indicator
     @resolve_chat
     @feature('warnings')
-    def warnings(bot, update):
+    def warnings(update: Update, context: CallbackContext):
         if update.message.reply_to_message:
             message = update.message.reply_to_message
         else:
@@ -1788,26 +1785,26 @@ class ModerationHandler():
         groupmember = DB.get_groupmember(update.message.chat.id, message.from_user.id)
         warnings = json.loads(groupmember.warnings)
         if not warnings:
-            bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text='{} has not received any warnings in this chat.'.format(message.from_user.name), reply_to_message_id=update.message.message_id)
             return
 
         warningtext = "{} has received the following warnings since they joined:\n".format(message.from_user.name)
-        warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
+        warningtext += Helpers.format_warnings(context.bot, update.message.chat, warnings)
 
-        bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
     @retry
     @busy_indicator
     @ensure_admin
-    def warn(bot, update):
+    def warn(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to warn the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
-        if update.message.reply_to_message.from_user.id == bot.id:
-            bot.send_message(chat_id=update.message.chat.id, text=random.choice(["What did I even do!", "I'm just trying to help!", "Have you checked /auditlog to find the real culprit?", "I-I'm sorry..."]), reply_to_message_id=update.message.message_id)
+        if update.message.reply_to_message.from_user.id == context.bot.id:
+            context.bot.send_message(chat_id=update.message.chat.id, text=random.choice(["What did I even do!", "I'm just trying to help!", "Have you checked /auditlog to find the real culprit?", "I-I'm sorry..."]), reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1827,15 +1824,15 @@ class ModerationHandler():
 
         warningtext = "{}, you just received a warning. You have received a total of {} warnings since you joined. See /warnings for more information. (Admin reference: #event{})".format(message.from_user.name, len(warnings), ceil(timestamp))
 
-        bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
+            warningtext += Helpers.format_warnings(context.bot, update.message.chat, warnings)
 
             try:
-                bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+                context.bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
             except TelegramError as e:
                 if (e.message == "Chat not found"):
                     group.controlchannel_id = None
@@ -1846,9 +1843,9 @@ class ModerationHandler():
     @retry
     @busy_indicator
     @ensure_admin
-    def clearwarnings(bot, update):
+    def clearwarnings(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to clear the warnings of the person who wrote it.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to clear the warnings of the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1858,16 +1855,16 @@ class ModerationHandler():
         groupmember.warnings = json.dumps(warnings)
         groupmember.save()
 
-        bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
     @retry
     @busy_indicator
     @ensure_admin
-    def mute(bot, update):
+    def mute(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to mute the person who wrote it.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to mute the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         try:
@@ -1898,29 +1895,29 @@ class ModerationHandler():
         groupmember.save()
 
         try:
-            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date, permissions=ChatPermissions(can_send_messages=False))
+            context.bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date, permissions=ChatPermissions(can_send_messages=False))
         except (BadRequest, Unauthorized):
-            chat = CachedBot.get_chat(bot, message.chat_id)
+            chat = CachedBot.get_chat(context.bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
-                bot.send_message(chat_id=update.message.chat.id, text="I can't mute the chat owner.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.message.chat.id, text="I can't mute the chat owner.", reply_to_message_id=update.message.message_id)
             elif user_status == 'administrator':
                 for admin in chat.get_administrators():
                     if admin.status == 'creator':
-                        bot.send_message(chat_id=update.message.chat.id, text="If you want to mute another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
+                        context.bot.send_message(chat_id=update.message.chat.id, text="If you want to mute another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
                         return
             else:
-                bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to mute anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", ceil(timestamp)), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat.id, text="I've muted {} (unmute: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", ceil(timestamp)), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
+            warningtext += Helpers.format_warnings(context.bot, update.message.chat, warnings)
 
-            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+            context.bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
 
     @staticmethod
@@ -1928,29 +1925,29 @@ class ModerationHandler():
     @retry
     @busy_indicator
     @ensure_admin
-    def unmute(bot, update):
+    def unmute(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to unmute the person who wrote it.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to unmute the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
 
         try:
-            bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
+            context.bot.restrict_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
         except (BadRequest, Unauthorized):
-            bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to unmute this person.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to unmute this person.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've unmuted {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat.id, text="I've unmuted {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
     @retry
     @busy_indicator
     @ensure_admin
-    def kick(bot, update):
+    def kick(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to kick the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -1969,39 +1966,39 @@ class ModerationHandler():
         groupmember.save()
 
         try:
-            bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+            context.bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
         except (BadRequest, Unauthorized):
-            chat = CachedBot.get_chat(bot, message.chat_id)
+            chat = CachedBot.get_chat(context.bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
-                bot.send_message(chat_id=update.message.chat.id, text="I can't kick the chat owner.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.message.chat.id, text="I can't kick the chat owner.", reply_to_message_id=update.message.message_id)
             elif user_status == 'administrator':
                 for admin in chat.get_administrators():
                     if admin.status == 'creator':
-                        bot.send_message(chat_id=update.message.chat.id, text="If you want to kick another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
+                        context.bot.send_message(chat_id=update.message.chat.id, text="If you want to kick another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
                         return
             else:
-                bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to kick anyone.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to kick anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-        bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}. (Admin reference: #event{})".format(message.from_user.name, ceil(timestamp)), reply_to_message_id=update.message.message_id)
+        context.bot.unban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+        context.bot.send_message(chat_id=update.message.chat.id, text="I've kicked {}. (Admin reference: #event{})".format(message.from_user.name, ceil(timestamp)), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
+            warningtext += Helpers.format_warnings(context.bot, update.message.chat, warnings)
 
-            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+            context.bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
     @staticmethod
     @run_async
     @retry
     @busy_indicator
     @ensure_admin
-    def ban(bot, update):
+    def ban(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to ban the person who wrote it.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Reply to a message to ban the person who wrote it.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
@@ -2032,29 +2029,29 @@ class ModerationHandler():
         groupmember.save()
 
         try:
-            bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date)
+            context.bot.kick_chat_member(chat_id=message.chat_id, user_id=message.from_user.id, until_date=until_date)
         except (BadRequest, Unauthorized):
-            chat = CachedBot.get_chat(bot, message.chat_id)
+            chat = CachedBot.get_chat(context.bot, message.chat_id)
             user_status = chat.get_member(message.from_user.id).status
             if user_status == 'creator':
-                bot.send_message(chat_id=update.message.chat.id, text="I can't ban the chat owner.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.message.chat.id, text="I can't ban the chat owner.", reply_to_message_id=update.message.message_id)
             elif user_status == 'administrator':
                 for admin in chat.get_administrators():
                     if admin.status == 'creator':
-                        bot.send_message(chat_id=update.message.chat.id, text="If you want to ban another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
+                        context.bot.send_message(chat_id=update.message.chat.id, text="If you want to ban another administrator, you'll have to take it up with {}.".format(admin.user.name), reply_to_message_id=update.message.message_id)
                         return
             else:
-                bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to ban anyone.", reply_to_message_id=update.message.message_id)
+                context.bot.send_message(chat_id=update.message.chat.id, text="I don't seem to have permission to ban anyone.", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", ceil(timestamp)), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat.id, text="I've banned {} (unban: {}). (Admin reference: #event{})".format(message.from_user.name, "{} UTC".format(str(datetime.datetime.utcfromtimestamp(until_date)).split(".")[0]) if until_date else "never", ceil(timestamp)), reply_to_message_id=update.message.message_id)
 
         group = DB.get_group(update.message.chat.id)
         if group.controlchannel_id:
             warningtext = "Warning summary for {} in {}:\n".format(update.message.reply_to_message.from_user.name, update.message.chat.title)
-            warningtext += Helpers.format_warnings(bot, update.message.chat, warnings)
+            warningtext += Helpers.format_warnings(context.bot, update.message.chat, warnings)
 
-            bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
+            context.bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
     @staticmethod
     @run_async
@@ -2063,13 +2060,13 @@ class ModerationHandler():
     @resolve_chat
     @ensure_admin
     @feature('say')
-    def say(bot, update):
+    def say(update: Update, context: CallbackContext):
         message = update.message.text.split(' ', 1)
         if len(message) == 1:
-            bot.send_message(chat_id=update.message.chat_id, text="Say what?", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat_id, text="Say what?", reply_to_message_id=update.message.message_id)
             return
 
-        bot.send_message(chat_id=update.message.chat_id, text=message[1])
+        context.bot.send_message(chat_id=update.message.chat_id, text=message[1])
 
     @staticmethod
     @run_async
@@ -2077,8 +2074,8 @@ class ModerationHandler():
     @busy_indicator
     @feature('admins')
     @requires_confirmation
-    def call_mods(bot, update):
-        bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
+    def call_mods(update: Update, context: CallbackContext):
+        context.bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -2086,13 +2083,13 @@ class ModerationHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def toggle_mutegroup(bot, update):
+    def toggle_mutegroup(update: Update, context: CallbackContext):
         currently_enabled = update.message.chat.id in global_mutedgroups
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(currently_enabled), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(currently_enabled), reply_to_message_id=update.message.message_id)
             return
 
         if bool(enabled):
@@ -2100,7 +2097,7 @@ class ModerationHandler():
         else:
             global_mutedgroups.discard(update.message.chat.id)
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Mute group: {}\nPlease note, for performance reasons, this value is stored in memory and will be reset on bot restart.".format(str(enabled)), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Mute group: {}\nPlease note, for performance reasons, this value is stored in memory and will be reset on bot restart.".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
     @run_async
@@ -2108,26 +2105,26 @@ class ModerationHandler():
     @busy_indicator
     @resolve_chat
     @ensure_admin
-    def toggle_revokeinvitelinkafterjoin(bot, update):
+    def toggle_revokeinvitelinkafterjoin(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.chat.id)
 
         try:
             enabled = bool(strtobool(update.message.text.split(' ', 1)[1]))
         except (IndexError, ValueError):
-            bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.revoke_invite_link_after_join)))), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.effective_chat.id, text="Current status: {}. Please specify true or false to change.".format(bool(strtobool(str(group.revoke_invite_link_after_join)))), reply_to_message_id=update.message.message_id)
             return
 
         group.revoke_invite_link_after_join = enabled
         group.save()
 
-        bot.send_message(chat_id=update.effective_chat.id, text="Revoke invite link after join: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Revoke invite link after join: {}".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    def handle_message(bot, update):
-        if update.message.chat.id not in global_mutedgroups:
+    def handle_message(update: Update, context: CallbackContext):
+        if not hasattr(update, 'messge') or (update.message.chat.id not in global_mutedgroups):
             return
 
-        chat = CachedBot.get_chat(bot, update.message.chat.id)
+        chat = CachedBot.get_chat(context.bot, update.message.chat.id)
         if chat.get_member(update.message.from_user.id).status not in ['creator', 'administrator']:
             update.message.delete()
             raise DispatcherHandlerStop()
@@ -2144,37 +2141,37 @@ class SauceNaoHandler():
     @retry
     @busy_indicator
     @feature('source')
-    def get_source(bot, update):
+    def get_source(update: Update, context: CallbackContext):
         if not update.message.reply_to_message:
-            bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="You didn't reply to the message you want the source of.", reply_to_message_id=update.message.message_id)
             return
 
         message = update.message.reply_to_message
         if len(message.photo) == 0:
-            bot.send_message(chat_id=update.message.chat.id, text="I see no picture here.", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="I see no picture here.", reply_to_message_id=update.message.message_id)
             return
 
-        picture = bot.get_file(file_id=message.photo[-1].file_id)
+        picture = context.bot.get_file(file_id=message.photo[-1].file_id)
         picture_data = io.BytesIO()
         picture.download(out=picture_data)
         request_url = 'https://saucenao.com/search.php?output_type=2&numres=1&api_key={}'.format(saucenao_token)
         r = requests.post(request_url, files={'file': ("image.png", picture_data.getvalue())})
         if r.status_code != 200:
-            bot.send_message(chat_id=update.message.chat.id, text="SauceNao failed me :( HTTP {}".format(r.status_code), reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="SauceNao failed me :( HTTP {}".format(r.status_code), reply_to_message_id=update.message.message_id)
             return
 
         result_data = json.JSONDecoder(object_pairs_hook=OrderedDict).decode(r.text)
         if int(result_data['header']['results_returned']) == 0:
-            bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(", reply_to_message_id=update.message.message_id)
+            context.bot.send_message(chat_id=update.message.chat.id, text="Couldn't find a source :(", reply_to_message_id=update.message.message_id)
             return
 
         results = sorted(result_data['results'], key=lambda result: float(result['header']['similarity']))
 
-        bot.send_message(chat_id=update.message.chat.id, text="I'm {}% sure this is the source: {}".format(results[-1]['header']['similarity'], results[-1]['data']['ext_urls'][0]), reply_to_message_id=update.message.message_id)
+        context.bot.send_message(chat_id=update.message.chat.id, text="I'm {}% sure this is the source: {}".format(results[-1]['header']['similarity'], results[-1]['data']['ext_urls'][0]), reply_to_message_id=update.message.message_id)
 
 
 # Setup
-updater = Updater(token=token)
+updater = Updater(token=token, use_context=True)
 dispatcher = updater.dispatcher
 
 # Global vars
