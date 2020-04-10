@@ -1870,7 +1870,7 @@ class ModerationHandler():
         try:
             # min 1 minute, max 1 year, other things are considered permanent by Telegram
             duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
-        except IndexError:
+        except (IndexError, ValueError):
             duration = 0
 
         if duration > 0:
@@ -2008,7 +2008,7 @@ class ModerationHandler():
         try:
             # min 1 minute, max 1 year, other things are considered permanent by Telegram
             duration = Helpers.parse_duration(update.message.text.split(' ', 1)[1], min_duration=60, max_duration=31536000)
-        except IndexError:
+        except (IndexError, ValueError):
             duration = 0
 
         if duration > 0:
