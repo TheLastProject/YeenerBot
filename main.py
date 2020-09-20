@@ -34,7 +34,6 @@ from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ChatPermissions, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.error import BadRequest, Unauthorized, TelegramError
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
-from telegram.ext.dispatcher import run_async
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -110,10 +109,7 @@ def retry(function):
             time.sleep(i)
 
         # Final try
-        try:
-            return function(update=update, context=context, **optional_args)
-        except Exception as e:
-            return ErrorHandler.handle_error(update=update, context=context)
+        return function(update=update, context=context, **optional_args)
 
     return wrapper
 
@@ -280,10 +276,10 @@ class SupportsFilter():
 
     @staticmethod
     def add_support(command, telegramFilter):
-        if not telegramFilter in SupportsFilter.types:
+        if telegramFilter not in SupportsFilter.types:
             SupportsFilter.types[telegramFilter] = []
 
-        if not command in SupportsFilter.types[telegramFilter]:
+        if command not in SupportsFilter.types[telegramFilter]:
             SupportsFilter.types[telegramFilter].append(command)
 
 
@@ -667,7 +663,6 @@ class CallbackHandler():
         dispatcher.add_handler(message_handler, 99999) # Lowest possible priority
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     def handle_callback(update: Update, context: CallbackContext):
@@ -689,6 +684,7 @@ class CallbackHandler():
                 return
 
         update.callback_query.message.delete()
+
         # We use -1 for "all chats", except in control channels, then it's only "all related control channels"
         control_channels = []
         is_control_channel = False
@@ -733,7 +729,8 @@ class CallbackHandler():
             message = Message(message_id=-1, date=datetime.datetime.utcnow(), from_user=update.callback_query.from_user, chat=chat, text=command, bot=context.bot, reply_to_message=reply_to_message)
             new_update = Update(update_id=-1, message=message)
             new_update._effective_chat = update.callback_query.message.chat  # I sure hope this won't break in a future version: https://github.com/python-telegram-bot/python-telegram-bot/blob/d4b5bd40a5545a238ebd63f7ffcc1811691526b0/telegram/update.py#L96<Paste>
-            context.update_queue.put(new_update)
+            # Queue up in global dispatcher
+            updater.update_queue.put(new_update)
 
         if reply_to_message:
             update.callback_query.answer(text='Executing {} on message'.format(command))
@@ -741,7 +738,6 @@ class CallbackHandler():
             update.callback_query.answer(text='Sent {} to {}'.format(command, chats[0].title if chat_id != str(-1) else "all chats"))
 
     @staticmethod
-    @run_async
     def handle_message(update: Update, context: CallbackContext):
         if update.update_id == -1:
             return
@@ -761,7 +757,7 @@ class CallbackHandler():
         if len(supported_commands) == 0:
             return
 
-        MessageCache.messages[update.message.chat_id] = update.message
+        MessageCache.messages[update.message.chat.id] = update.message
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('/{}'.format(command), callback_data='{}_/{}'.format(update.message.chat.id, command))] for command in supported_commands])
         context.bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
 
@@ -772,7 +768,6 @@ class DebugHandler():
         dispatcher.add_handler(ping_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @rate_limited
@@ -790,7 +785,6 @@ class SudoHandler():
         dispatcher.add_handler(sudo_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     def sudo(update: Update, context: CallbackContext):
@@ -815,7 +809,6 @@ class FeatureHandler():
         dispatcher.add_handler(enablefeature_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -830,7 +823,6 @@ class FeatureHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -868,7 +860,6 @@ class FeatureHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Feature {} disabled".format(feature), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -940,7 +931,6 @@ class GreetingHandler():
             bot.kick_chat_member(chat_id=group.chat_id, user_id=member.user.id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     def start(update: Update, context: CallbackContext):
@@ -957,7 +947,6 @@ class GreetingHandler():
             RuleHandler.send_rules(update, context)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -969,7 +958,6 @@ class GreetingHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Welcome message cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -986,7 +974,6 @@ class GreetingHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1006,7 +993,6 @@ class GreetingHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Force rule read: {} (dependency welcome: {}, dependency rules set: {})".format(str(enabled), 'welcome' in group.get_enabled_features(), group.rules is not None), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1028,18 +1014,15 @@ class GreetingHandler():
 
 
     @staticmethod
-    @run_async
     def created(update: Update, context: CallbackContext):
         DB.get_group(update.message.chat.id)  # ensure creation
 
     @staticmethod
-    @run_async
     def migrated(update: Update, context: CallbackContext):
         group = DB.get_group(update.message.migrate_from_chat_id)
         DB.migrate_group(group, update.message.migrate_to_chat_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @feature('welcome')
@@ -1109,7 +1092,6 @@ class GroupStateHandler():
         dispatcher.add_handler(setcommandratelimit_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator_user
     @resolve_chat
@@ -1145,7 +1127,6 @@ class GroupStateHandler():
             context.bot.send_message(chat_id=update.effective_chat.id, text="There are no known related chats for {}".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1192,7 +1173,6 @@ class GroupStateHandler():
         group.save()
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1227,7 +1207,6 @@ class GroupStateHandler():
         group.save()
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1242,7 +1221,6 @@ class GroupStateHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text=message, reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1295,7 +1273,6 @@ class GroupStateHandler():
         group.save()
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator_user
     @resolve_chat
@@ -1308,7 +1285,6 @@ class GroupStateHandler():
         context.bot.send_message(chat_id=update.message.from_user.id, text = "{}\n\n{}".format(update.message.chat.title, description))
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1327,7 +1303,6 @@ class GroupStateHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1341,7 +1316,6 @@ class GroupStateHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} is {}".format(update.message.chat.title, invite_link), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1352,7 +1326,6 @@ class GroupStateHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Invite link for {} revoked".format(update.message.chat.title), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1385,7 +1358,6 @@ class RandomHandler():
         dispatcher.add_handler(toggleroulettekicks_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @feature('roll')
@@ -1485,7 +1457,6 @@ class RandomHandler():
         context.bot.send_message(chat_id=update.message.chat_id, text=text.rstrip("\n"), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @feature('flip')
@@ -1498,7 +1469,6 @@ class RandomHandler():
         ], weights=[45,45,10])[0]), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @feature('shake')
@@ -1583,7 +1553,6 @@ class RandomHandler():
             context.bot.send_message(chat_id=update.message.chat_id, parse_mode="html", text="<code>• *Click* You're safe. For now.\n{} chamber{} remaining.</code>".format(chambersremaining,"s" if chambersremaining != 1 else ""), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1613,7 +1582,6 @@ class RuleHandler():
         dispatcher.add_handler(setrules_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1625,7 +1593,6 @@ class RuleHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Rules cleared.", reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1642,7 +1609,6 @@ class RuleHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator_user
     @resolve_chat
@@ -1736,7 +1702,6 @@ class ModerationHandler():
         dispatcher.add_handler(message_handler, group=0)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator_user
     @resolve_chat
@@ -1771,7 +1736,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.message.from_user.id, text=audittext)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -1794,7 +1758,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text=warningtext, reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @ensure_admin
@@ -1839,7 +1802,6 @@ class ModerationHandler():
                     group.save()
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @ensure_admin
@@ -1858,7 +1820,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.message.chat.id, text="Warnings of user {} cleared.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @ensure_admin
@@ -1921,7 +1882,6 @@ class ModerationHandler():
 
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @ensure_admin
@@ -1941,7 +1901,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.message.chat.id, text="I've unmuted {}.".format(message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @ensure_admin
@@ -1992,7 +1951,6 @@ class ModerationHandler():
             context.bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @ensure_admin
@@ -2054,7 +2012,6 @@ class ModerationHandler():
             context.bot.send_message(chat_id=group.controlchannel_id, text=warningtext)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -2069,7 +2026,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.message.chat_id, text=message[1])
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @feature('admins')
@@ -2078,7 +2034,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.message.chat_id, text="{}, anyone there? {} believes there's a serious issue going on that needs moderator attention. Please check ASAP!".format(", ".join(admin.user.name for admin in update.message.chat.get_administrators() if not admin.user.is_bot), update.message.from_user.name), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -2100,7 +2055,6 @@ class ModerationHandler():
         context.bot.send_message(chat_id=update.effective_chat.id, text="Mute group: {}\nPlease note, for performance reasons, this value is stored in memory and will be reset on bot restart.".format(str(enabled)), reply_to_message_id=update.message.message_id)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @resolve_chat
@@ -2137,7 +2091,6 @@ class SauceNaoHandler():
         dispatcher.add_handler(saucenao_handler, group=1)
 
     @staticmethod
-    @run_async
     @retry
     @busy_indicator
     @feature('source')
