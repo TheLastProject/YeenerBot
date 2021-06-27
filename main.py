@@ -239,7 +239,7 @@ def resolve_chat(function):
             context.bot.send_message(chat_id=update.message.chat_id, text=message, reply_to_message_id=update.message.message_id)
             return
 
-        MessageCache.messages[update.message.chat.id] = update.message
+        MessageCache.set(update.message.chat.id, update.message)
         keyboard_buttons = [InlineKeyboardButton("[ALL CHATS]" if not is_control_channel else "[ALL RELATED CHATS]", callback_data=-1)]
         for chat in chats:
             keyboard_buttons.append(InlineKeyboardButton(chat.title, callback_data=chat.id))
@@ -253,7 +253,7 @@ def requires_confirmation(function):
         if update.message.text.split(' ')[-1] != '--yes-i-really-am-sure':
             cloned_message = deepcopy(update.message)
             cloned_message.text += " --yes-i-really-am-sure"
-            MessageCache.messages[update.message.chat.id] = cloned_message
+            MessageCache.set(update.message.chat.id, cloned_message)
             yes_button = InlineKeyboardButton("Yes, I am sure", callback_data=update.message.chat.id)
             keyboard = InlineKeyboardMarkup([[yes_button]])
             context.bot.send_message(chat_id=update.message.chat_id, text="Are you really sure you want to run '{}'?".format(update.message.text), reply_markup=keyboard, reply_to_message_id=update.message.message_id)
@@ -387,6 +387,14 @@ class DB():
 
 class MessageCache():
     messages = {}
+
+    @staticmethod
+    def set(key, message):
+        MessageCache.messages[str(key)] = message
+
+    @staticmethod
+    def pop(key):
+        return MessageCache.messages.pop(str(key))
 
 
 class User():
@@ -671,13 +679,13 @@ class CallbackHandler():
         if '_' in update.callback_query.data:
             chat_id, command = update.callback_query.data.split('_', 1)
             try:
-                reply_to_message = MessageCache.messages.pop(update.callback_query.message.chat.id)
+                reply_to_message = MessageCache.pop(update.callback_query.message.chat.id)
             except KeyError:
                 pass
         else:
             chat_id = update.callback_query.data
             try:
-                command = MessageCache.messages.pop(update.callback_query.message.chat.id).text
+                command = MessageCache.pop(update.callback_query.message.chat.id).text
             except KeyError:
                 update.callback_query.answer(text="I'm sorry, but I lost your message. Please retry. Most likely I restarted between sending the command and choosing the chat to send it to.")
                 update.callback_query.message.delete()
@@ -757,7 +765,7 @@ class CallbackHandler():
         if len(supported_commands) == 0:
             return
 
-        MessageCache.messages[update.message.chat.id] = update.message
+        MessageCache.set(update.message.chat.id, update.message)
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('/{}'.format(command), callback_data='{}_/{}'.format(update.message.chat.id, command))] for command in supported_commands])
         context.bot.send_message(chat_id=update.message.chat_id, text="Execute which command on this message?", reply_markup=keyboard, reply_to_message_id=update.message.message_id)
 
