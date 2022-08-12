@@ -32,7 +32,7 @@ import sqlalchemy
 from cachetools import cached, TTLCache
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from telegram import ChatAction, ChatPermissions, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
-from telegram.error import BadRequest, Unauthorized, TelegramError
+from telegram.error import BadRequest, ChatMigrated, Unauthorized, TelegramError
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, DispatcherHandlerStop, Filters, MessageHandler, Updater
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -537,7 +537,11 @@ class ErrorHandler():
 
         reply_to_message = update.message.message_id if update.message else None
 
-        if type(context.error) == Unauthorized and update.message:
+        if type(context.error) == ChatMigrated:
+            print(f"DEBUG: Telegram is upset at me in chat {update.effective_chat_id} because this chat turned into a supergroup and somehow I didn't know. Migrating now...")
+            GreetingHandler.migrated()
+            print(f"DEBUG: Migration of {update.effective_chat_id} should've been succesful")
+        elif type(context.error) == Unauthorized and update.message:
             text = "{}, I don't have permission to PM you. Please click the following link and then press START: {}.".format(update.message.from_user.name, 'https://telegram.me/{}?start=rules_{}'.format(context.bot.name[1:], update.message.chat.id))
             context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_to_message_id=reply_to_message)
             return
