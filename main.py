@@ -913,7 +913,6 @@ class GreetingHandler():
         clearwelcome_handler = CommandHandler('clearwelcome', GreetingHandler.clear_welcome)
         setwelcome_handler = CommandHandler('setwelcome', GreetingHandler.set_welcome)
         toggleforceruleread_handler = CommandHandler('toggleforceruleread', GreetingHandler.toggle_forceruleread)
-        toggleforcerulereadtimeout_handler = CommandHandler('toggleforcerulereadtimeout', GreetingHandler.toggle_forcerulereadtimeout)
         dispatcher.add_handler(start_handler, group=1)
         dispatcher.add_handler(created_handler, group=1)
         dispatcher.add_handler(migrated_handler, group=1)
@@ -921,7 +920,6 @@ class GreetingHandler():
         dispatcher.add_handler(clearwelcome_handler, group=1)
         dispatcher.add_handler(setwelcome_handler, group=1)
         dispatcher.add_handler(toggleforceruleread_handler, group=1)
-        dispatcher.add_handler(toggleforcerulereadtimeout_handler, group=1)
 
     @staticmethod
     @retry
