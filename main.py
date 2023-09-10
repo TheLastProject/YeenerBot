@@ -419,13 +419,12 @@ class User():
 
 
 class Group():
-    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, forceruleread_timeout=None, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
+    def __init__(self, group_id, enabled_features=None, disabled_features=None, welcome_message=None, forceruleread_enabled=False, description=None, rules=None, relatedchat_ids=None, bullet=None, chamber=None, auditlog=None, controlchannel_id=None, roulettekicks_enabled=False, commandratelimit=0, revoke_invite_link_after_join=False):
         self.group_id = group_id
         self.enabled_features = enabled_features if enabled_features is not None else json.dumps([])
         self.disabled_features = disabled_features if disabled_features is not None else json.dumps([])
         self.welcome_message = welcome_message
         self.forceruleread_enabled = forceruleread_enabled
-        self.forceruleread_timeout = forceruleread_timeout if forceruleread_timeout is not None else 1800  # Unused, but datatables does not like removing entries
         self.description = description
         self.rules = rules
         self.relatedchat_ids = relatedchat_ids if relatedchat_ids is not None else json.dumps([])
@@ -459,7 +458,7 @@ class Group():
 
     @staticmethod
     def get_keys():
-        return ['group_id', 'enabled_features', 'disabled_features', 'welcome_message', 'forceruleread_enabled', 'forceruleread_timeout', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
+        return ['group_id', 'enabled_features', 'disabled_features', 'welcome_message', 'forceruleread_enabled', 'description', 'rules', 'relatedchat_ids', 'bullet', 'chamber', 'auditlog', 'controlchannel_id', 'roulettekicks_enabled', 'commandratelimit', 'revoke_invite_link_after_join']
 
     @staticmethod
     def get_types():
@@ -468,7 +467,6 @@ class Group():
                 'disabled_features': sqlalchemy.types.Text,
                 'welcome_message': sqlalchemy.types.Text,
                 'forceruleread_enabled': sqlalchemy.types.Boolean,
-                'forceruleread_timeout': sqlalchemy.types.Integer,  # Unused, but datatables does not like removing entries
                 'description': sqlalchemy.types.Text,
                 'rules': sqlalchemy.types.Text,
                 'relatedchat_ids': sqlalchemy.types.Text,
